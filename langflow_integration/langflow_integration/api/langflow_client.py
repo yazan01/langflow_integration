@@ -7,7 +7,7 @@ import frappe
 import requests
 import json
 from frappe import _
-from frappe.utils import now_datetime, get_datetime
+from frappe.utils import now_datetime
 
 
 @frappe.whitelist()
@@ -26,9 +26,9 @@ def call_langflow(flow_id, input_data, session_id=None, tweaks=None, timeout=30)
         dict: النتيجة مع حالة النجاح والبيانات
     """
     try:
-        # التحقق من الصلاحيات
-        if not frappe.has_permission("Langflow Integration", "read"):
-            frappe.throw(_("You don't have permission to use Langflow Integration"))
+        # التحقق البسيط من تسجيل الدخول
+        if frappe.session.user == 'Guest':
+            frappe.throw(_("Please login to use this feature"))
         
         # إعدادات Langflow
         langflow_url = frappe.conf.get("langflow_url") or "http://localhost:7860"
@@ -51,15 +51,15 @@ def call_langflow(flow_id, input_data, session_id=None, tweaks=None, timeout=30)
             headers["x-api-key"] = langflow_api_key
         
         payload = {
-            "input_value": input_data,
+            "input_value": str(input_data),
             "output_type": "chat",
             "input_type": "chat",
         }
         
         if session_id:
-            payload["session_id"] = session_id
+            payload["session_id"] = str(session_id)
             
-        if tweaks:
+        if tweaks and isinstance(tweaks, dict):
             payload["tweaks"] = tweaks
         
         # تسجيل الطلب
@@ -113,7 +113,12 @@ def call_langflow(flow_id, input_data, session_id=None, tweaks=None, timeout=30)
         }
         
     except requests.exceptions.HTTPError as e:
-        error_msg = f"HTTP Error {e.response.status_code}: {e.response.text}"
+        try:
+            error_detail = e.response.json()
+            error_msg = f"HTTP Error {e.response.status_code}: {json.dumps(error_detail, ensure_ascii=False)}"
+        except:
+            error_msg = f"HTTP Error {e.response.status_code}: {e.response.text}"
+        
         frappe.log_error(f"Langflow HTTP Error: {error_msg}", "Langflow Integration")
         return {
             "success": False,
@@ -144,7 +149,7 @@ def process_document_with_ai(doctype, docname, prompt, flow_id=None, include_fie
         dict: النتيجة مع حالة النجاح والبيانات
     """
     try:
-        # التحقق من الصلاحيات
+        # التحقق من صلاحيات المستند فقط
         if not frappe.has_permission(doctype, "read", docname):
             frappe.throw(_("You don't have permission to access this document"))
         
@@ -300,8 +305,12 @@ def get_langflow_config():
         dict: الإعدادات
     """
     try:
+        # التحقق من الصلاحيات بدون throw
         if not frappe.has_permission("System Settings", "read"):
-            frappe.throw(_("Insufficient permissions"))
+            return {
+                "success": False,
+                "error": _("Insufficient permissions")
+            }
         
         config = {
             "langflow_url": frappe.conf.get("langflow_url") or "http://localhost:7860",

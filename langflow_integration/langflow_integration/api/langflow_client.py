@@ -1,5 +1,5 @@
 """
-Langflow Integration API Client
+Langflow Integration API Client - Enhanced with Hidden Context
 Handles communication between ERPNext and Langflow AI platform
 """
 
@@ -11,9 +11,9 @@ from frappe.utils import now_datetime
 
 
 @frappe.whitelist()
-def call_langflow(flow_id, input_data, session_id=None, tweaks=None, timeout=30):
+def call_langflow(flow_id, input_data, session_id=None, tweaks=None, timeout=30, hidden_context=None):
     """
-    استدعاء Langflow flow من ERPNext
+    استدعاء Langflow flow من ERPNext مع دعم السياق المخفي
     
     Args:
         flow_id: معرف الـ Flow في Langflow
@@ -21,6 +21,7 @@ def call_langflow(flow_id, input_data, session_id=None, tweaks=None, timeout=30)
         session_id: معرف الجلسة (اختياري)
         tweaks: تعديلات على معاملات الـ Flow (اختياري)
         timeout: وقت الانتظار الأقصى بالثواني
+        hidden_context: بيانات إضافية لا تظهر للمستخدم (اختياري)
         
     Returns:
         dict: النتيجة مع حالة النجاح والبيانات
@@ -50,8 +51,20 @@ def call_langflow(flow_id, input_data, session_id=None, tweaks=None, timeout=30)
         if langflow_api_key:
             headers["x-api-key"] = langflow_api_key
         
+        # دمج السياق المخفي مع الرسالة إذا كان موجوداً
+        final_input = str(input_data)
+        
+        if hidden_context:
+            # إضافة السياق المخفي في بداية الرسالة
+            # سيتم إرساله لـ Langflow لكن لن يظهر في Widget
+            if isinstance(hidden_context, dict):
+                context_str = json.dumps(hidden_context, ensure_ascii=False, indent=2)
+                final_input = f"[SYSTEM_CONTEXT]\n{context_str}\n[/SYSTEM_CONTEXT]\n\n{input_data}"
+            else:
+                final_input = f"[SYSTEM_CONTEXT]\n{hidden_context}\n[/SYSTEM_CONTEXT]\n\n{input_data}"
+        
         payload = {
-            "input_value": str(input_data),
+            "input_value": final_input,
             "output_type": "chat",
             "input_type": "chat",
         }
@@ -67,6 +80,7 @@ def call_langflow(flow_id, input_data, session_id=None, tweaks=None, timeout=30)
             "timestamp": now_datetime(),
             "flow_id": flow_id,
             "input_preview": str(input_data)[:200],
+            "has_hidden_context": bool(hidden_context),
             "user": frappe.session.user
         }
         
@@ -130,6 +144,109 @@ def call_langflow(flow_id, input_data, session_id=None, tweaks=None, timeout=30)
         return {
             "success": False,
             "error": str(e)
+        }
+
+
+@frappe.whitelist()
+def chat_with_langflow(message, flow_id=None, session_id=None, doctype=None, is_first_message=False):
+    """
+    محادثة بسيطة مع Langflow مع دعم إرسال بيانات خفية في أول رسالة
+    
+    Args:
+        message: الرسالة النصية
+        flow_id: معرف الـ Flow
+        session_id: معرف الجلسة للحفاظ على السياق
+        doctype: نوع المستند (لجلب البيانات الخفية)
+        is_first_message: هل هذه أول رسالة في المحادثة؟
+        
+    Returns:
+        dict: الرد من Langflow
+    """
+    try:
+        if not flow_id:
+            flow_id = frappe.conf.get("langflow_chat_flow_id")
+            
+        if not flow_id:
+            return {
+                "success": False,
+                "error": _("Chat flow ID not configured")
+            }
+        
+        hidden_context = None
+        
+        # إذا كانت أول رسالة وتم تحديد DocType، جلب البيانات
+        if is_first_message and doctype:
+            hidden_context = get_doctype_metadata(doctype)
+        
+        result = call_langflow(
+            flow_id=flow_id,
+            input_data=message,
+            session_id=session_id,
+            hidden_context=hidden_context
+        )
+        
+        return result
+        
+    except Exception as e:
+        frappe.log_error(f"Chat Error: {str(e)}", "Langflow Integration")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
+def get_doctype_metadata(doctype):
+    """
+    جلب بيانات DocType (الحقول، الإحصائيات، إلخ) لإرسالها كسياق مخفي
+    
+    Args:
+        doctype: اسم الـ DocType
+        
+    Returns:
+        dict: البيانات المخفية
+    """
+    try:
+        # جلب معلومات DocType
+        meta = frappe.get_meta(doctype)
+        
+        # جلب إحصائيات
+        total_count = frappe.db.count(doctype)
+        
+        # جلب الحقول المهمة
+        fields_info = []
+        for field in meta.fields:
+            if field.fieldtype not in ['Section Break', 'Column Break', 'Tab Break', 'HTML']:
+                fields_info.append({
+                    'fieldname': field.fieldname,
+                    'label': field.label,
+                    'fieldtype': field.fieldtype,
+                    'options': field.options if field.options else None
+                })
+        
+        # جلب عينة من البيانات (آخر 5 سجلات مثلاً)
+        recent_records = frappe.get_all(
+            doctype,
+            fields=['name', 'creation', 'modified'],
+            order_by='creation desc',
+            limit=5
+        )
+        
+        metadata = {
+            "doctype": doctype,
+            "total_records": total_count,
+            "fields": fields_info[:20],  # أول 20 حقل فقط
+            "recent_records": recent_records,
+            "user": frappe.session.user,
+            "timestamp": now_datetime().isoformat()
+        }
+        
+        return metadata
+        
+    except Exception as e:
+        frappe.log_error(f"Error getting metadata for {doctype}: {str(e)}")
+        return {
+            "doctype": doctype,
+            "error": "Could not fetch metadata"
         }
 
 
@@ -200,45 +317,6 @@ Document Data:
         frappe.log_error(f"AI Processing Error: {str(e)}\n{frappe.get_traceback()}", "Langflow Integration")
         return {
             "success": False, 
-            "error": str(e)
-        }
-
-
-@frappe.whitelist()
-def chat_with_langflow(message, flow_id=None, session_id=None):
-    """
-    محادثة بسيطة مع Langflow
-    
-    Args:
-        message: الرسالة النصية
-        flow_id: معرف الـ Flow
-        session_id: معرف الجلسة للحفاظ على السياق
-        
-    Returns:
-        dict: الرد من Langflow
-    """
-    try:
-        if not flow_id:
-            flow_id = frappe.conf.get("langflow_chat_flow_id")
-            
-        if not flow_id:
-            return {
-                "success": False,
-                "error": _("Chat flow ID not configured")
-            }
-        
-        result = call_langflow(
-            flow_id=flow_id,
-            input_data=message,
-            session_id=session_id
-        )
-        
-        return result
-        
-    except Exception as e:
-        frappe.log_error(f"Chat Error: {str(e)}", "Langflow Integration")
-        return {
-            "success": False,
             "error": str(e)
         }
 

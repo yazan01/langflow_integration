@@ -1,6 +1,6 @@
 /**
- * Langflow Global Integration - DIRECT SOLUTION
- * This version uses the most reliable method to add buttons
+ * Langflow Global Integration - IMPROVED SOLUTION
+ * Fixed: Button not appearing in Form View
  */
 
 // Global function to create chat widget
@@ -237,38 +237,22 @@ if (!$('#langflow-global-styles').length) {
 window.create_langflow_widget = create_langflow_widget;
 
 // ============================================
-// DIRECT BUTTON INJECTION - MOST RELIABLE
+// IMPROVED BUTTON INJECTION FOR FORM VIEW
 // ============================================
 
-function inject_langflow_button_to_current_page() {
-    // For FORM View
-    if (cur_frm && !cur_frm.is_new()) {
-        // Check if button group exists
-        if (!cur_frm.page.btn_group) {
-            console.log('⚠️ Langflow: Button group not ready yet');
-            return;
-        }
-        
-        // Check if already added
-        const existing = cur_frm.page.btn_group.find('.btn-langflow-chat');
-        if (existing.length > 0) {
-            return; // Already added
-        }
-        
-        // Create button HTML directly
-        const btn_html = `
-            <button class="btn btn-default btn-sm ellipsis btn-langflow-chat" 
-                    data-label="AI Chat Widget"
-                    style="margin-right: 8px;">
-                <span class="btn-label">🤖 AI Chat Widget</span>
-            </button>
-        `;
-        
-        // Inject button
-        cur_frm.page.btn_group.prepend(btn_html);
-        
-        // Attach click event
-        cur_frm.page.btn_group.find('.btn-langflow-chat').on('click', function() {
+function inject_langflow_button_to_form() {
+    if (!cur_frm || cur_frm.is_new()) {
+        return;
+    }
+    
+    // Check if already added
+    if (cur_frm._langflow_button_added) {
+        return;
+    }
+    
+    try {
+        // Method 1: Using add_custom_button (Most Reliable)
+        cur_frm.add_custom_button(__('🤖 AI Chat Widget'), function() {
             create_langflow_widget({
                 doctype: cur_frm.doctype,
                 docname: cur_frm.docname,
@@ -276,16 +260,26 @@ function inject_langflow_button_to_current_page() {
             });
         });
         
-        console.log(`✅ Langflow: Button injected to ${cur_frm.doctype} form`);
+        cur_frm._langflow_button_added = true;
+        console.log(`✅ Langflow: Button added to ${cur_frm.doctype} form`);
+        
+    } catch (e) {
+        console.error('❌ Langflow Form Button Error:', e);
+    }
+}
+
+function inject_langflow_button_to_list() {
+    if (!cur_list || !cur_list.page) {
+        return;
     }
     
-    // For LIST View
-    if (cur_list && cur_list.page) {
-        const existing = cur_list.page.inner_toolbar.find('.btn-langflow-chat');
-        if (existing.length > 0) {
-            return; // Already added
-        }
-        
+    // Check if already added
+    const existing = cur_list.page.inner_toolbar.find('.btn-langflow-chat');
+    if (existing.length > 0) {
+        return;
+    }
+    
+    try {
         const btn_html = `
             <button class="btn btn-default btn-sm btn-langflow-chat" 
                     style="margin-left: 10px;">
@@ -303,67 +297,88 @@ function inject_langflow_button_to_current_page() {
             });
         });
         
-        console.log(`✅ Langflow: Button injected to ${cur_list.doctype} list`);
+        console.log(`✅ Langflow: Button added to ${cur_list.doctype} list`);
+        
+    } catch (e) {
+        console.error('❌ Langflow List Button Error:', e);
     }
 }
 
+// Main injection function
+function inject_langflow_buttons() {
+    inject_langflow_button_to_form();
+    inject_langflow_button_to_list();
+}
+
 // ============================================
-// MULTIPLE TRIGGERS
+// EVENT LISTENERS - COMPREHENSIVE TRIGGERS
 // ============================================
 
-// Trigger 1: Immediate check
+// Trigger 1: Document Ready
 $(document).ready(function() {
-    console.log('✅ Langflow Global Integration Loaded Successfully');
-    setTimeout(inject_langflow_button_to_current_page, 500);
-    setTimeout(inject_langflow_button_to_current_page, 1500);
-    setTimeout(inject_langflow_button_to_current_page, 3000);
+    console.log('✅ Langflow Global Integration Loaded');
+    setTimeout(inject_langflow_buttons, 500);
+    setTimeout(inject_langflow_buttons, 1500);
 });
 
-// Trigger 2: Route changes
+// Trigger 2: Frappe Ready
+frappe.ready(function() {
+    setTimeout(inject_langflow_buttons, 300);
+});
+
+// Trigger 3: Route Changes
 frappe.router.on('change', function() {
-    setTimeout(inject_langflow_button_to_current_page, 500);
-    setTimeout(inject_langflow_button_to_current_page, 1000);
+    // Clear the flag when route changes
+    if (cur_frm) {
+        cur_frm._langflow_button_added = false;
+    }
+    setTimeout(inject_langflow_buttons, 500);
+    setTimeout(inject_langflow_buttons, 1000);
 });
 
-// Trigger 3: Page show events
-$(document).on('page-change', function() {
-    setTimeout(inject_langflow_button_to_current_page, 300);
+// Trigger 4: Form-specific events
+frappe.ui.form.on('*', {
+    refresh: function(frm) {
+        setTimeout(inject_langflow_button_to_form, 200);
+    },
+    onload: function(frm) {
+        setTimeout(inject_langflow_button_to_form, 300);
+    }
 });
 
-// Trigger 4: Form events
-$(document).on('form-load form-refresh', function() {
-    setTimeout(inject_langflow_button_to_current_page, 200);
+// Trigger 5: DOM mutation observer for form toolbar
+function setup_form_observer() {
+    const observer = new MutationObserver(function(mutations) {
+        for (let mutation of mutations) {
+            if (mutation.addedNodes.length > 0) {
+                setTimeout(inject_langflow_button_to_form, 100);
+            }
+        }
+    });
+    
+    // Observe the page element
+    if (cur_frm && cur_frm.page && cur_frm.page.wrapper) {
+        observer.observe(cur_frm.page.wrapper[0], {
+            childList: true,
+            subtree: true
+        });
+    }
+}
+
+// Setup observer when form loads
+$(document).on('form-load', function() {
+    setTimeout(setup_form_observer, 500);
+    setTimeout(inject_langflow_button_to_form, 300);
 });
 
-// Trigger 5: Periodic check (every 3 seconds for first minute)
+// Trigger 6: Periodic check (first 30 seconds only)
 let check_count = 0;
 const periodic_check = setInterval(function() {
-    inject_langflow_button_to_current_page();
+    inject_langflow_buttons();
     check_count++;
-    if (check_count > 20) {
+    if (check_count > 10) {
         clearInterval(periodic_check);
     }
 }, 3000);
 
-// Trigger 6: MutationObserver for btn_group
-const observer = new MutationObserver(function(mutations) {
-    mutations.forEach(function(mutation) {
-        if (mutation.addedNodes.length > 0) {
-            setTimeout(inject_langflow_button_to_current_page, 100);
-        }
-    });
-});
-
-// Start observing when document is ready
-$(document).ready(function() {
-    setTimeout(function() {
-        if (cur_frm && cur_frm.page && cur_frm.page.btn_group) {
-            observer.observe(cur_frm.page.btn_group[0], {
-                childList: true,
-                subtree: true
-            });
-        }
-    }, 1000);
-});
-
-console.log('🚀 Langflow: Multiple injection triggers activated');
+console.log('🚀 Langflow: All injection triggers activated');

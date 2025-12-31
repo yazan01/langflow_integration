@@ -63,34 +63,19 @@ def extract_cv_data(applicant_name, cv_file_url, flow_id=None):
                 "error": _("Failed to read CV file: {0}").format(str(e))
             }
         
-        # تحضير البيانات كنص بسيط
-        input_text = f"""
-Please extract all relevant information from this CV/Resume.
-
-Applicant: {applicant_name}
-File: {cv_file_url}
-File Type: {file_extension}
-
-CV Content (Base64):
-{file_content}
-
-Extract:
-- Full Name
-- Email Address
-- Phone Number
-- Education (degrees, universities, years)
-- Work Experience (companies, positions, dates)
-- Skills
-- Languages
-- Certifications
-
-Format the output clearly and professionally.
-"""
+        # تحضير البيانات
+        input_data = {
+            "applicant_name": applicant_name,
+            "file_url": cv_file_url,
+            "file_content": file_content,
+            "file_extension": file_extension,
+            "instruction": "Extract all relevant information from this CV/Resume including: personal information, education, work experience, skills, certifications, and languages."
+        }
         
-        # استدعاء Langflow بنص بسيط (بدون json.dumps)
+        # استدعاء Langflow
         result = call_langflow(
             flow_id=flow_id,
-            input_data=input_text,
+            input_data=json.dumps(input_data, ensure_ascii=False),
             session_id=None
         )
         
@@ -298,6 +283,44 @@ Document Data:
         }
 
 
+# @frappe.whitelist()
+# def chat_with_langflow(message, flow_id=None, session_id=None, doctype):
+#     """
+#     محادثة بسيطة مع Langflow
+    
+#     Args:
+#         message: الرسالة النصية
+#         flow_id: معرف الـ Flow
+#         session_id: معرف الجلسة للحفاظ على السياق
+        
+#     Returns:
+#         dict: الرد من Langflow
+#     """
+#     try:
+#         if not flow_id:
+#             flow_id = frappe.conf.get("langflow_chat_flow_id")
+            
+#         if not flow_id:
+#             return {
+#                 "success": False,
+#                 "error": _("Chat flow ID not configured")
+#             }
+        
+#         result = call_langflow(
+#             flow_id=flow_id,
+#             input_data=message,
+#             session_id=session_id
+#         )
+        
+#         return result
+        
+#     except Exception as e:
+#         frappe.log_error(f"Chat Error: {str(e)}", "Langflow Integration")
+#         return {
+#             "success": False,
+#             "error": str(e)
+#         }
+
 @frappe.whitelist()
 def chat_with_langflow(message, flow_id=None, session_id=None, doctype=None):
     """
@@ -386,6 +409,7 @@ def chat_with_langflow(message, flow_id=None, session_id=None, doctype=None):
         }
 
 
+
 @frappe.whitelist()
 def test_connection():
     """
@@ -459,8 +483,7 @@ def get_langflow_config():
             "langflow_url": frappe.conf.get("langflow_url") or "http://localhost:7860",
             "api_key_configured": bool(frappe.conf.get("langflow_api_key")),
             "document_processor_id": frappe.conf.get("langflow_document_processor_id"),
-            "chat_flow_id": frappe.conf.get("langflow_chat_flow_id"),
-            "cv_extract_flow_id": frappe.conf.get("langflow_cv_extract_flow_id")
+            "chat_flow_id": frappe.conf.get("langflow_chat_flow_id")
         }
         
         return {
@@ -473,3 +496,4 @@ def get_langflow_config():
             "success": False,
             "error": str(e)
         }
+

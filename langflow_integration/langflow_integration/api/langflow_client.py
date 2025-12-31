@@ -284,7 +284,10 @@ def chat_with_langflow(message, flow_id=None, session_id=None, doctype=None):
             # ----------------------------------
             data = frappe.get_all(
                 doctype,
-                fields="*"
+                fields="*",
+                filters={
+                    "docstatus": ["<", 2]
+                }
             )
 
             context_prefix = f"""

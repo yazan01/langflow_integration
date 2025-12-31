@@ -204,43 +204,128 @@ Document Data:
         }
 
 
-@frappe.whitelist()
-def chat_with_langflow(message, flow_id=None, session_id=None):
-    """
-    محادثة بسيطة مع Langflow
+# @frappe.whitelist()
+# def chat_with_langflow(message, flow_id=None, session_id=None, doctype):
+#     """
+#     محادثة بسيطة مع Langflow
     
-    Args:
-        message: الرسالة النصية
-        flow_id: معرف الـ Flow
-        session_id: معرف الجلسة للحفاظ على السياق
+#     Args:
+#         message: الرسالة النصية
+#         flow_id: معرف الـ Flow
+#         session_id: معرف الجلسة للحفاظ على السياق
         
-    Returns:
-        dict: الرد من Langflow
+#     Returns:
+#         dict: الرد من Langflow
+#     """
+#     try:
+#         if not flow_id:
+#             flow_id = frappe.conf.get("langflow_chat_flow_id")
+            
+#         if not flow_id:
+#             return {
+#                 "success": False,
+#                 "error": _("Chat flow ID not configured")
+#             }
+        
+#         result = call_langflow(
+#             flow_id=flow_id,
+#             input_data=message,
+#             session_id=session_id
+#         )
+        
+#         return result
+        
+#     except Exception as e:
+#         frappe.log_error(f"Chat Error: {str(e)}", "Langflow Integration")
+#         return {
+#             "success": False,
+#             "error": str(e)
+#         }
+
+@frappe.whitelist()
+def chat_with_langflow(message, flow_id=None, session_id=None, doctype=None):
     """
+    Chat with Langflow
+    - Inject full DocType data on first message only
+    - No permission checks
+    """
+
     try:
+        # ----------------------------------
+        # Flow ID
+        # ----------------------------------
         if not flow_id:
             flow_id = frappe.conf.get("langflow_chat_flow_id")
-            
+
         if not flow_id:
             return {
                 "success": False,
-                "error": _("Chat flow ID not configured")
+                "error": "Chat flow ID not configured"
             }
-        
+
+        if not session_id:
+            session_id = frappe.generate_hash(length=32)
+
+        # ----------------------------------
+        # Session handling (first message only)
+        # ----------------------------------
+        cache = frappe.cache()
+        cache_key = f"langflow_session_initialized::{session_id}"
+
+        context_prefix = ""
+        is_first_message = not cache.get_value(cache_key)
+
+        if is_first_message and doctype:
+            # Mark session as initialized
+            cache.set_value(cache_key, True, expires_in_sec=60 * 60)
+
+            # ----------------------------------
+            # Fetch ALL data from table
+            # ----------------------------------
+            data = frappe.get_all(
+                doctype,
+                fields="*"
+            )
+
+            context_prefix = f"""
+أنت مساعد ذكي متصل مباشرة بقاعدة بيانات ERPNext.
+
+السياق:
+- DocType: {doctype}
+- عدد السجلات: {len(data)}
+
+بيانات الجدول كاملة (JSON):
+{frappe.as_json(data, indent=2)}
+
+استخدم هذه البيانات للإجابة بدقة على الأسئلة التالية.
+"""
+
+        # ----------------------------------
+        # Final message
+        # ----------------------------------
+        final_message = f"{context_prefix}\n\n{message}" if context_prefix else message
+
+        # ----------------------------------
+        # Call Langflow
+        # ----------------------------------
         result = call_langflow(
             flow_id=flow_id,
-            input_data=message,
+            input_data=final_message,
             session_id=session_id
         )
-        
+
         return result
-        
+
     except Exception as e:
-        frappe.log_error(f"Chat Error: {str(e)}", "Langflow Integration")
+        frappe.log_error(
+            message=f"{str(e)}\n{frappe.get_traceback()}",
+            title="Langflow Chat Error"
+        )
         return {
             "success": False,
             "error": str(e)
         }
+
 
 
 @frappe.whitelist()

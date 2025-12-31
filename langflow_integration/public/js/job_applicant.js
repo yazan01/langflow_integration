@@ -6,9 +6,14 @@ frappe.ui.form.on('Job Applicant', {
                 analyze_job_applicant_with_ai(frm);
             }, __('Langflow'));
             
-            // Add Chat button
-            frm.add_custom_button(__('Chat with AI'), function() {
+            // Add Chat button (Dialog mode)
+            frm.add_custom_button(__('Chat Dialog'), function() {
                 open_ai_chat(frm);
+            }, __('Langflow'));
+            
+            // Add Embedded Chat Widget button
+            frm.add_custom_button(__('Embed Chat Widget'), function() {
+                embed_chat_widget(frm);
             }, __('Langflow'));
             
             // Add Test Connection button (for admins)
@@ -29,7 +34,7 @@ function analyze_job_applicant_with_ai(frm) {
                 label: __('Analysis Prompt'),
                 fieldname: 'prompt',
                 fieldtype: 'Small Text',
-                default: 'قم بتحليل بيانات هذا العميل وقدم توصيات لتحسين العلاقة معه',
+                default: 'قم بتحليل بيانات هذا المرشح وقدم تقييماً شاملاً لمؤهلاته ومدى ملاءمته للوظيفة',
                 reqd: 1
             }
         ],
@@ -73,6 +78,208 @@ function analyze_job_applicant_with_ai(frm) {
     d.show();
 }
 
+// Embedded Chat Widget - Adds a persistent chat interface to the page
+function embed_chat_widget(frm) {
+    // Remove existing widget if present
+    $('#langflow-embedded-widget').remove();
+    
+    // Create embedded chat widget
+    let widget_html = `
+        <div id="langflow-embedded-widget" style="
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 380px;
+            height: 600px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            display: flex;
+            flex-direction: column;
+            z-index: 1050;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        ">
+            <!-- Header -->
+            <div style="
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 16px 20px;
+                border-radius: 12px 12px 0 0;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            ">
+                <div>
+                    <div style="font-weight: 600; font-size: 16px;">🤖 AI Recruitment Assistant</div>
+                    <div style="font-size: 12px; opacity: 0.9;">Applicant: ${frm.doc.applicant_name || frm.doc.name}</div>
+                </div>
+                <button id="langflow-close-widget" style="
+                    background: rgba(255,255,255,0.2);
+                    border: none;
+                    color: white;
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 50%;
+                    cursor: pointer;
+                    font-size: 20px;
+                    line-height: 1;
+                    transition: background 0.2s;
+                " onmouseover="this.style.background='rgba(255,255,255,0.3)'"
+                   onmouseout="this.style.background='rgba(255,255,255,0.2)'">×</button>
+            </div>
+            
+            <!-- Messages Container -->
+            <div id="langflow-widget-messages" style="
+                flex: 1;
+                overflow-y: auto;
+                padding: 16px;
+                background: #f8f9fa;
+            "></div>
+            
+            <!-- Input Area -->
+            <div style="
+                padding: 16px;
+                border-top: 1px solid #e9ecef;
+                background: white;
+                border-radius: 0 0 12px 12px;
+            ">
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" 
+                           id="langflow-widget-input" 
+                           class="form-control" 
+                           placeholder="${__('Type your message...')}"
+                           style="
+                               flex: 1;
+                               border: 1px solid #dee2e6;
+                               border-radius: 20px;
+                               padding: 10px 16px;
+                               font-size: 14px;
+                           " />
+                    <button id="langflow-widget-send" 
+                            class="btn btn-primary"
+                            style="
+                                border-radius: 20px;
+                                padding: 10px 20px;
+                                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                border: none;
+                                font-weight: 600;
+                            ">${__('Send')}</button>
+                </div>
+                <div style="margin-top: 8px; font-size: 11px; color: #6c757d; text-align: center;">
+                    Powered by Langflow AI
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Append to body
+    $('body').append(widget_html);
+    
+    // Generate session ID
+    let session_id = frappe.utils.get_random(32);
+    
+    // Setup event handlers
+    $('#langflow-close-widget').on('click', function() {
+        $('#langflow-embedded-widget').fadeOut(300, function() {
+            $(this).remove();
+        });
+    });
+    
+    $('#langflow-widget-send').on('click', function() {
+        send_widget_message(frm, session_id);
+    });
+    
+    $('#langflow-widget-input').on('keypress', function(e) {
+        if (e.which === 13) {
+            send_widget_message(frm, session_id);
+        }
+    });
+    
+    // Add welcome message
+    setTimeout(function() {
+        append_widget_message('ai', `مرحباً! 👋 أنا مساعد AI للتوظيف. كيف يمكنني مساعدتك بخصوص المرشح ${frm.doc.applicant_name || frm.doc.name}؟`);
+    }, 300);
+    
+    // Show animation
+    $('#langflow-embedded-widget').hide().fadeIn(300);
+}
+
+function send_widget_message(frm, session_id) {
+    let $input = $('#langflow-widget-input');
+    let message = $input.val().trim();
+    if (!message) return;
+    
+    append_widget_message('user', message);
+    $input.val('');
+    
+    // Show typing indicator
+    append_widget_message('ai', '<div class="typing-indicator"><span></span><span></span><span></span></div>');
+    
+    // Add context about the current applicant
+    let context_message = `المرشح: ${frm.doc.applicant_name || frm.doc.name}\nالسؤال: ${message}`;
+    
+    frappe.call({
+        method: 'langflow_integration.langflow_integration.api.langflow_client.chat_with_langflow',
+        args: {
+            message: context_message,
+            session_id: session_id
+        },
+        callback: function(r) {
+            // Remove typing indicator
+            $('#langflow-widget-messages > div:last-child').remove();
+            
+            if (r.message && r.message.success) {
+                let response = extract_ai_response(r.message.data);
+                append_widget_message('ai', response);
+            } else {
+                let error_msg = r.message && r.message.error ? r.message.error : __('Unknown error occurred');
+                append_widget_message('ai', `❌ ${__('Sorry, I encountered an error')}: ${error_msg}`);
+            }
+        },
+        error: function(r) {
+            // Remove typing indicator
+            $('#langflow-widget-messages > div:last-child').remove();
+            append_widget_message('ai', `❌ ${__('Failed to connect to AI service. Please check your connection.')}`);
+        }
+    });
+}
+
+function append_widget_message(type, message) {
+    let isUser = type === 'user';
+    let alignClass = isUser ? 'flex-end' : 'flex-start';
+    let bgColor = isUser ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#fff';
+    let textColor = isUser ? '#fff' : '#333';
+    let boxShadow = isUser ? 'none' : '0 2px 8px rgba(0,0,0,0.08)';
+    
+    let msg_html = `
+        <div style="
+            display: flex;
+            justify-content: ${alignClass};
+            margin-bottom: 12px;
+            animation: slideIn 0.3s ease-out;
+        ">
+            <div style="
+                background: ${bgColor};
+                color: ${textColor};
+                padding: 12px 16px;
+                border-radius: ${isUser ? '18px 18px 4px 18px' : '18px 18px 18px 4px'};
+                max-width: 75%;
+                box-shadow: ${boxShadow};
+                word-wrap: break-word;
+                font-size: 14px;
+                line-height: 1.5;
+            ">
+                ${message}
+            </div>
+        </div>
+    `;
+    
+    let $messages = $('#langflow-widget-messages');
+    $messages.append(msg_html);
+    $messages.scrollTop($messages[0].scrollHeight);
+}
+
+// Dialog-based chat (original functionality)
 function open_ai_chat(frm) {
     let chat_dialog = new frappe.ui.Dialog({
         title: __('AI Assistant'),
@@ -111,7 +318,6 @@ function open_ai_chat(frm) {
     
     chat_dialog.show();
     
-    // Wait for dialog to render before adding welcome message
     setTimeout(function() {
         append_chat_message('ai', `مرحباً! أنا مساعد AI للمرشحين. كيف يمكنني مساعدتك بخصوص المرشح ${frm.doc.applicant_name}؟`);
     }, 100);
@@ -124,10 +330,8 @@ function send_chat_message(frm, session_id) {
     append_chat_message('user', message);
     $('#langflow-message-input').val('');
     
-    // Show typing indicator
     append_chat_message('ai', '<em>جاري الكتابة...</em>');
     
-    // Add context about the current applicant
     let context_message = `المرشح: ${frm.doc.applicant_name}\nالسؤال: ${message}`;
     
     frappe.call({
@@ -137,10 +341,7 @@ function send_chat_message(frm, session_id) {
             session_id: session_id
         },
         callback: function(r) {
-            // Remove typing indicator
             $('#langflow-messages > div:last-child').remove();
-            
-            console.log('Chat Response:', r.message); // Debug log
             
             if (r.message && r.message.success) {
                 let response = extract_ai_response(r.message.data);
@@ -151,10 +352,8 @@ function send_chat_message(frm, session_id) {
             }
         },
         error: function(r) {
-            // Remove typing indicator
             $('#langflow-messages > div:last-child').remove();
-            console.error('Chat Error:', r);
-            append_chat_message('ai', `❌ ${__('Failed to connect to AI service. Please check your connection.')}`);
+            append_chat_message('ai', `❌ ${__('Failed to connect to AI service.')}`);
         }
     });
 }
@@ -174,7 +373,6 @@ function append_chat_message(type, message) {
     let $messages = $('#langflow-messages');
     let $container = $('#langflow-chat-container');
     
-    // Check if elements exist before trying to manipulate them
     if ($messages.length && $container.length) {
         $messages.append(msg_html);
         $container.scrollTop($container[0].scrollHeight);
@@ -207,17 +405,12 @@ function show_ai_response(data, title) {
 
 function extract_ai_response(data) {
     try {
-        console.log('Extracting from data:', data); // Debug log
-        
-        // Method 1: Check outputs array
         if (data.outputs && Array.isArray(data.outputs) && data.outputs.length > 0) {
             let output = data.outputs[0];
             
-            // Check nested outputs
             if (output.outputs && Array.isArray(output.outputs) && output.outputs.length > 0) {
                 let result = output.outputs[0];
                 
-                // Check for message in results
                 if (result.results) {
                     if (result.results.message) {
                         if (typeof result.results.message === 'string') {
@@ -227,13 +420,11 @@ function extract_ai_response(data) {
                             return result.results.message.text;
                         }
                     }
-                    // Check for text field directly in results
                     if (result.results.text) {
                         return result.results.text;
                     }
                 }
                 
-                // Check for message at result level
                 if (result.message) {
                     if (typeof result.message === 'string') {
                         return result.message;
@@ -245,14 +436,11 @@ function extract_ai_response(data) {
             }
         }
         
-        // Method 2: Check session_id response
         if (data.session_id) {
-            // Look for any text fields in the data
             let text = find_text_in_object(data);
             if (text) return text;
         }
         
-        // Fallback: return formatted JSON
         return `<pre>${JSON.stringify(data, null, 2)}</pre>`;
         
     } catch (e) {
@@ -261,7 +449,6 @@ function extract_ai_response(data) {
     }
 }
 
-// Helper function to recursively search for text responses
 function find_text_in_object(obj, depth = 0, maxDepth = 10) {
     if (depth > maxDepth) return null;
     
@@ -270,7 +457,6 @@ function find_text_in_object(obj, depth = 0, maxDepth = 10) {
     }
     
     if (typeof obj === 'object' && obj !== null) {
-        // Priority fields to check
         const priority_fields = ['text', 'message', 'content', 'response', 'output', 'answer'];
         
         for (let field of priority_fields) {
@@ -283,7 +469,6 @@ function find_text_in_object(obj, depth = 0, maxDepth = 10) {
             }
         }
         
-        // Check all other fields
         for (let key in obj) {
             if (priority_fields.includes(key)) continue;
             let result = find_text_in_object(obj[key], depth + 1, maxDepth);
@@ -318,4 +503,72 @@ function test_langflow_connection() {
             }
         }
     });
+}
+
+// Add CSS for typing indicator animation
+if (!$('#langflow-widget-styles').length) {
+    $('head').append(`
+        <style id="langflow-widget-styles">
+            @keyframes slideIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(10px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+            
+            .typing-indicator {
+                display: flex;
+                gap: 4px;
+                padding: 8px 0;
+            }
+            
+            .typing-indicator span {
+                width: 8px;
+                height: 8px;
+                background: #667eea;
+                border-radius: 50%;
+                animation: typing 1.4s infinite;
+            }
+            
+            .typing-indicator span:nth-child(2) {
+                animation-delay: 0.2s;
+            }
+            
+            .typing-indicator span:nth-child(3) {
+                animation-delay: 0.4s;
+            }
+            
+            @keyframes typing {
+                0%, 60%, 100% {
+                    transform: translateY(0);
+                    opacity: 0.7;
+                }
+                30% {
+                    transform: translateY(-10px);
+                    opacity: 1;
+                }
+            }
+            
+            #langflow-widget-messages::-webkit-scrollbar {
+                width: 6px;
+            }
+            
+            #langflow-widget-messages::-webkit-scrollbar-track {
+                background: #f1f1f1;
+            }
+            
+            #langflow-widget-messages::-webkit-scrollbar-thumb {
+                background: #888;
+                border-radius: 3px;
+            }
+            
+            #langflow-widget-messages::-webkit-scrollbar-thumb:hover {
+                background: #555;
+            }
+        </style>
+    `);
 }

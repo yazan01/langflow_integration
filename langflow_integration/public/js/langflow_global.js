@@ -144,9 +144,12 @@ function send_langflow_message(context_data, session_id) {
     $input.val('');
     append_langflow_message('ai', '<div class="typing-indicator"><span></span><span></span><span></span></div>');
     
+    // let context_message = context_data.is_list
+    //     ? `DocType: ${context_data.doctype}\nContext: List View\nQuestion: ${message}\n\nأريد الاستعلام عن بيانات ${context_data.doctype} في وضع العرض القائمة.`
+    //     : `DocType: ${context_data.doctype}\nDocument Name: ${context_data.docname}\nQuestion: ${message}\n\nأريد الاستعلام عن المستند ${context_data.docname} من نوع ${context_data.doctype}.`;
     let context_message = context_data.is_list
-        ? `DocType: ${context_data.doctype}\nContext: List View\nQuestion: ${message}\n\nأريد الاستعلام عن بيانات ${context_data.doctype} في وضع العرض القائمة.`
-        : `DocType: ${context_data.doctype}\nDocument Name: ${context_data.docname}\nQuestion: ${message}\n\nأريد الاستعلام عن المستند ${context_data.docname} من نوع ${context_data.doctype}.`;
+        ? `Question: ${message}\n`
+        : `Question: ${message}\n`;
     
     frappe.call({
         method: 'langflow_integration.langflow_integration.api.langflow_client.chat_with_langflow',

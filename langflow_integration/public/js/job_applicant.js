@@ -111,8 +111,10 @@ function open_ai_chat(frm) {
     
     chat_dialog.show();
     
-    // Welcome message
-    append_chat_message('ai', `مرحباً! أنا مساعد AI للعملاء. كيف يمكنني مساعدتك بخصوص العميل ${frm.doc.applicant_name}؟`);
+    // Wait for dialog to render before adding welcome message
+    setTimeout(function() {
+        append_chat_message('ai', `مرحباً! أنا مساعد AI للمرشحين. كيف يمكنني مساعدتك بخصوص المرشح ${frm.doc.applicant_name}؟`);
+    }, 100);
 }
 
 function send_chat_message(frm, session_id) {
@@ -154,8 +156,14 @@ function append_chat_message(type, message) {
         </div>
     `;
     
-    $('#langflow-messages').append(msg_html);
-    $('#langflow-chat-container').scrollTop($('#langflow-chat-container')[0].scrollHeight);
+    let $messages = $('#langflow-messages');
+    let $container = $('#langflow-chat-container');
+    
+    // Check if elements exist before trying to manipulate them
+    if ($messages.length && $container.length) {
+        $messages.append(msg_html);
+        $container.scrollTop($container[0].scrollHeight);
+    }
 }
 
 function show_ai_response(data, title) {

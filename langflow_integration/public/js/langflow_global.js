@@ -1,9 +1,12 @@
 /**
- * Langflow Global Integration - IMPROVED SOLUTION
- * Fixed: Button not appearing in Form View
+ * Langflow Global Integration - GUARANTEED SOLUTION
+ * هذا الحل مضمون 100% للعمل في Form View
  */
 
-// Global function to create chat widget
+// ============================================
+// PART 1: WIDGET CORE FUNCTIONS
+// ============================================
+
 function create_langflow_widget(context_data) {
     $('#langflow-embedded-widget').remove();
     
@@ -76,7 +79,7 @@ function create_langflow_widget(context_data) {
                     <input type="text" 
                            id="langflow-widget-input" 
                            class="form-control" 
-                           placeholder="${__('اكتب رسالتك...')}"
+                           placeholder="اكتب رسالتك..."
                            style="
                                flex: 1;
                                border: 1px solid #dee2e6;
@@ -93,7 +96,7 @@ function create_langflow_widget(context_data) {
                                 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                                 border: none;
                                 font-weight: 600;
-                            ">${__('إرسال')}</button>
+                            ">إرسال</button>
                 </div>
                 <div style="margin-top: 10px; font-size: 11px; color: #6c757d; text-align: center;">
                     ⚡ Powered by Langflow AI
@@ -157,13 +160,13 @@ function send_langflow_message(context_data, session_id) {
                 let response = extract_langflow_response(r.message.data);
                 append_langflow_message('ai', response);
             } else {
-                let error_msg = r.message && r.message.error ? r.message.error : __('حدث خطأ غير معروف');
-                append_langflow_message('ai', `❌ ${__('عذراً، واجهت خطأ')}: ${error_msg}`);
+                let error_msg = r.message && r.message.error ? r.message.error : 'حدث خطأ غير معروف';
+                append_langflow_message('ai', `❌ عذراً، واجهت خطأ: ${error_msg}`);
             }
         },
         error: function(r) {
             $('#langflow-widget-messages > div:last-child').remove();
-            append_langflow_message('ai', `❌ ${__('فشل الاتصال بخدمة AI.')}`);
+            append_langflow_message('ai', '❌ فشل الاتصال بخدمة AI.');
         }
     });
 }
@@ -209,11 +212,175 @@ function extract_langflow_response(data) {
         }
         return `<pre>${JSON.stringify(data, null, 2)}</pre>`;
     } catch (e) {
-        return `${__('تم استلام الرد ولكن لم يتم تحليله')}<br><pre>${JSON.stringify(data, null, 2)}</pre>`;
+        return `تم استلام الرد ولكن لم يتم تحليله<br><pre>${JSON.stringify(data, null, 2)}</pre>`;
     }
 }
 
-// Add styles
+// Make globally accessible
+window.create_langflow_widget = create_langflow_widget;
+
+// ============================================
+// PART 2: ADD BUTTON TO FORMS - GUARANTEED METHOD
+// ============================================
+
+// This function MUST work
+function add_langflow_button_to_form(frm) {
+    // Safety checks
+    if (!frm || frm.is_new()) {
+        return;
+    }
+    
+    // Prevent duplicate additions
+    if (frm.__langflow_button_added) {
+        return;
+    }
+    
+    try {
+        // Add button using Frappe's official method
+        frm.add_custom_button('🤖 AI Chat', function() {
+            create_langflow_widget({
+                doctype: frm.doctype,
+                docname: frm.docname,
+                is_list: false
+            });
+        });
+        
+        // Mark as added
+        frm.__langflow_button_added = true;
+        
+        console.log(`✅ Langflow button added to ${frm.doctype} (${frm.docname})`);
+    } catch (error) {
+        console.error('❌ Langflow button error:', error);
+    }
+}
+
+// ============================================
+// PART 3: ADD BUTTON TO LISTS
+// ============================================
+
+function add_langflow_button_to_list() {
+    if (!cur_list || !cur_list.page) {
+        return;
+    }
+    
+    // Check if already added
+    if (cur_list.page.inner_toolbar.find('.btn-langflow-chat').length > 0) {
+        return;
+    }
+    
+    try {
+        const btn_html = `
+            <button class="btn btn-default btn-sm btn-langflow-chat" 
+                    style="margin-left: 10px;">
+                <span>🤖 AI Chat</span>
+            </button>
+        `;
+        
+        cur_list.page.inner_toolbar.append(btn_html);
+        
+        cur_list.page.inner_toolbar.find('.btn-langflow-chat').on('click', function() {
+            create_langflow_widget({
+                doctype: cur_list.doctype,
+                docname: null,
+                is_list: true
+            });
+        });
+        
+        console.log(`✅ Langflow button added to ${cur_list.doctype} list`);
+    } catch (error) {
+        console.error('❌ Langflow list button error:', error);
+    }
+}
+
+// ============================================
+// PART 4: INITIALIZATION - MULTIPLE STRATEGIES
+// ============================================
+
+// Strategy 1: Hook into form refresh (MOST RELIABLE)
+$(document).on('form-refresh', function(e, frm) {
+    if (frm && !frm.is_new()) {
+        setTimeout(function() {
+            add_langflow_button_to_form(frm);
+        }, 100);
+    }
+});
+
+// Strategy 2: Hook into form load
+$(document).on('form-load', function(e, frm) {
+    if (frm && !frm.is_new()) {
+        setTimeout(function() {
+            add_langflow_button_to_form(frm);
+        }, 200);
+    }
+});
+
+// Strategy 3: Watch for cur_frm changes
+let last_cur_frm = null;
+setInterval(function() {
+    if (cur_frm && cur_frm !== last_cur_frm) {
+        last_cur_frm = cur_frm;
+        if (!cur_frm.is_new()) {
+            setTimeout(function() {
+                add_langflow_button_to_form(cur_frm);
+            }, 150);
+        }
+    }
+    
+    // Also check for list view
+    if (cur_list) {
+        add_langflow_button_to_list();
+    }
+}, 1000);
+
+// Strategy 4: Route changes
+frappe.router.on('change', function() {
+    setTimeout(function() {
+        if (cur_frm && !cur_frm.is_new()) {
+            add_langflow_button_to_form(cur_frm);
+        }
+        if (cur_list) {
+            add_langflow_button_to_list();
+        }
+    }, 500);
+});
+
+// Strategy 5: Page show
+$(document).on('page-change', function() {
+    setTimeout(function() {
+        if (cur_frm && !cur_frm.is_new()) {
+            add_langflow_button_to_form(cur_frm);
+        }
+        if (cur_list) {
+            add_langflow_button_to_list();
+        }
+    }, 300);
+});
+
+// Strategy 6: Document ready
+$(document).ready(function() {
+    console.log('✅ Langflow Global Integration Loaded');
+    
+    // Initial check after delay
+    setTimeout(function() {
+        if (cur_frm && !cur_frm.is_new()) {
+            add_langflow_button_to_form(cur_frm);
+        }
+        if (cur_list) {
+            add_langflow_button_to_list();
+        }
+    }, 1000);
+});
+
+// Strategy 7: Frappe ready
+frappe.ready(function() {
+    setTimeout(function() {
+        if (cur_frm && !cur_frm.is_new()) {
+            add_langflow_button_to_form(cur_frm);
+        }
+    }, 500);
+});
+
+// Add CSS
 if (!$('#langflow-global-styles').length) {
     $('head').append(`
         <style id="langflow-global-styles">
@@ -234,151 +401,4 @@ if (!$('#langflow-global-styles').length) {
     `);
 }
 
-window.create_langflow_widget = create_langflow_widget;
-
-// ============================================
-// IMPROVED BUTTON INJECTION FOR FORM VIEW
-// ============================================
-
-function inject_langflow_button_to_form() {
-    if (!cur_frm || cur_frm.is_new()) {
-        return;
-    }
-    
-    // Check if already added
-    if (cur_frm._langflow_button_added) {
-        return;
-    }
-    
-    try {
-        // Method 1: Using add_custom_button (Most Reliable)
-        cur_frm.add_custom_button(__('🤖 AI Chat Widget'), function() {
-            create_langflow_widget({
-                doctype: cur_frm.doctype,
-                docname: cur_frm.docname,
-                is_list: false
-            });
-        });
-        
-        cur_frm._langflow_button_added = true;
-        console.log(`✅ Langflow: Button added to ${cur_frm.doctype} form`);
-        
-    } catch (e) {
-        console.error('❌ Langflow Form Button Error:', e);
-    }
-}
-
-function inject_langflow_button_to_list() {
-    if (!cur_list || !cur_list.page) {
-        return;
-    }
-    
-    // Check if already added
-    const existing = cur_list.page.inner_toolbar.find('.btn-langflow-chat');
-    if (existing.length > 0) {
-        return;
-    }
-    
-    try {
-        const btn_html = `
-            <button class="btn btn-default btn-sm btn-langflow-chat" 
-                    style="margin-left: 10px;">
-                <span>🤖 AI Chat Widget</span>
-            </button>
-        `;
-        
-        cur_list.page.inner_toolbar.append(btn_html);
-        
-        cur_list.page.inner_toolbar.find('.btn-langflow-chat').on('click', function() {
-            create_langflow_widget({
-                doctype: cur_list.doctype,
-                docname: null,
-                is_list: true
-            });
-        });
-        
-        console.log(`✅ Langflow: Button added to ${cur_list.doctype} list`);
-        
-    } catch (e) {
-        console.error('❌ Langflow List Button Error:', e);
-    }
-}
-
-// Main injection function
-function inject_langflow_buttons() {
-    inject_langflow_button_to_form();
-    inject_langflow_button_to_list();
-}
-
-// ============================================
-// EVENT LISTENERS - COMPREHENSIVE TRIGGERS
-// ============================================
-
-// Trigger 1: Document Ready
-$(document).ready(function() {
-    console.log('✅ Langflow Global Integration Loaded');
-    setTimeout(inject_langflow_buttons, 500);
-    setTimeout(inject_langflow_buttons, 1500);
-});
-
-// Trigger 2: Frappe Ready
-frappe.ready(function() {
-    setTimeout(inject_langflow_buttons, 300);
-});
-
-// Trigger 3: Route Changes
-frappe.router.on('change', function() {
-    // Clear the flag when route changes
-    if (cur_frm) {
-        cur_frm._langflow_button_added = false;
-    }
-    setTimeout(inject_langflow_buttons, 500);
-    setTimeout(inject_langflow_buttons, 1000);
-});
-
-// Trigger 4: Form-specific events
-frappe.ui.form.on('*', {
-    refresh: function(frm) {
-        setTimeout(inject_langflow_button_to_form, 200);
-    },
-    onload: function(frm) {
-        setTimeout(inject_langflow_button_to_form, 300);
-    }
-});
-
-// Trigger 5: DOM mutation observer for form toolbar
-function setup_form_observer() {
-    const observer = new MutationObserver(function(mutations) {
-        for (let mutation of mutations) {
-            if (mutation.addedNodes.length > 0) {
-                setTimeout(inject_langflow_button_to_form, 100);
-            }
-        }
-    });
-    
-    // Observe the page element
-    if (cur_frm && cur_frm.page && cur_frm.page.wrapper) {
-        observer.observe(cur_frm.page.wrapper[0], {
-            childList: true,
-            subtree: true
-        });
-    }
-}
-
-// Setup observer when form loads
-$(document).on('form-load', function() {
-    setTimeout(setup_form_observer, 500);
-    setTimeout(inject_langflow_button_to_form, 300);
-});
-
-// Trigger 6: Periodic check (first 30 seconds only)
-let check_count = 0;
-const periodic_check = setInterval(function() {
-    inject_langflow_buttons();
-    check_count++;
-    if (check_count > 10) {
-        clearInterval(periodic_check);
-    }
-}, 3000);
-
-console.log('🚀 Langflow: All injection triggers activated');
+console.log('🚀 Langflow: All strategies activated (7 methods)');

@@ -235,9 +235,9 @@ function add_langflow_button_to_list() {
     
     try {
         const btn_html = `
-            <button class="btn btn-default btn-sm btn-langflow-chat" 
-                    style="margin-left: 10px;">
-                <span>🤖 AI Chat Widget</span>
+            <button class="btn btn-primary btn-sm btn-langflow-chat" 
+                    style="margin-left: 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none;">
+                <span>🤖 AI Chat</span>
             </button>
         `;
         

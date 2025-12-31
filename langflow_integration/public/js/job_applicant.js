@@ -124,6 +124,9 @@ function send_chat_message(frm, session_id) {
     append_chat_message('user', message);
     $('#langflow-message-input').val('');
     
+    // Show typing indicator
+    append_chat_message('ai', '<em>جاري الكتابة...</em>');
+    
     // Add context about the current applicant
     let context_message = `المرشح: ${frm.doc.applicant_name}\nالسؤال: ${message}`;
     
@@ -134,12 +137,24 @@ function send_chat_message(frm, session_id) {
             session_id: session_id
         },
         callback: function(r) {
+            // Remove typing indicator
+            $('#langflow-messages > div:last-child').remove();
+            
+            console.log('Chat Response:', r.message); // Debug log
+            
             if (r.message && r.message.success) {
                 let response = extract_ai_response(r.message.data);
                 append_chat_message('ai', response);
             } else {
-                append_chat_message('ai', __('Sorry, I encountered an error. Please try again.'));
+                let error_msg = r.message && r.message.error ? r.message.error : __('Unknown error occurred');
+                append_chat_message('ai', `❌ ${__('Sorry, I encountered an error')}: ${error_msg}`);
             }
+        },
+        error: function(r) {
+            // Remove typing indicator
+            $('#langflow-messages > div:last-child').remove();
+            console.error('Chat Error:', r);
+            append_chat_message('ai', `❌ ${__('Failed to connect to AI service. Please check your connection.')}`);
         }
     });
 }
@@ -192,23 +207,91 @@ function show_ai_response(data, title) {
 
 function extract_ai_response(data) {
     try {
-        // Try different paths to extract the response
-        if (data.outputs && data.outputs[0]) {
+        console.log('Extracting from data:', data); // Debug log
+        
+        // Method 1: Check outputs array
+        if (data.outputs && Array.isArray(data.outputs) && data.outputs.length > 0) {
             let output = data.outputs[0];
-            if (output.outputs && output.outputs[0]) {
+            
+            // Check nested outputs
+            if (output.outputs && Array.isArray(output.outputs) && output.outputs.length > 0) {
                 let result = output.outputs[0];
-                if (result.results && result.results.message) {
-                    return result.results.message.text || result.results.message;
+                
+                // Check for message in results
+                if (result.results) {
+                    if (result.results.message) {
+                        if (typeof result.results.message === 'string') {
+                            return result.results.message;
+                        }
+                        if (result.results.message.text) {
+                            return result.results.message.text;
+                        }
+                    }
+                    // Check for text field directly in results
+                    if (result.results.text) {
+                        return result.results.text;
+                    }
+                }
+                
+                // Check for message at result level
+                if (result.message) {
+                    if (typeof result.message === 'string') {
+                        return result.message;
+                    }
+                    if (result.message.text) {
+                        return result.message.text;
+                    }
                 }
             }
         }
         
-        // Fallback: return JSON
-        return JSON.stringify(data, null, 2);
+        // Method 2: Check session_id response
+        if (data.session_id) {
+            // Look for any text fields in the data
+            let text = find_text_in_object(data);
+            if (text) return text;
+        }
+        
+        // Fallback: return formatted JSON
+        return `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+        
     } catch (e) {
         console.error('Error extracting AI response:', e);
-        return __('Response received but could not be parsed');
+        return `${__('Response received but could not be parsed')}<br><pre>${JSON.stringify(data, null, 2)}</pre>`;
     }
+}
+
+// Helper function to recursively search for text responses
+function find_text_in_object(obj, depth = 0, maxDepth = 10) {
+    if (depth > maxDepth) return null;
+    
+    if (typeof obj === 'string' && obj.length > 10) {
+        return obj;
+    }
+    
+    if (typeof obj === 'object' && obj !== null) {
+        // Priority fields to check
+        const priority_fields = ['text', 'message', 'content', 'response', 'output', 'answer'];
+        
+        for (let field of priority_fields) {
+            if (obj[field]) {
+                if (typeof obj[field] === 'string') {
+                    return obj[field];
+                }
+                let result = find_text_in_object(obj[field], depth + 1, maxDepth);
+                if (result) return result;
+            }
+        }
+        
+        // Check all other fields
+        for (let key in obj) {
+            if (priority_fields.includes(key)) continue;
+            let result = find_text_in_object(obj[key], depth + 1, maxDepth);
+            if (result) return result;
+        }
+    }
+    
+    return null;
 }
 
 function test_langflow_connection() {

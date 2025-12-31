@@ -6,11 +6,6 @@ frappe.ui.form.on('Job Applicant', {
                 analyze_job_applicant_with_ai(frm);
             }, __('Langflow'));
             
-            // Add Chat button (Dialog mode)
-            frm.add_custom_button(__('Chat Dialog'), function() {
-                open_ai_chat(frm);
-            }, __('Langflow'));
-            
             // Add Embedded Chat Widget button
             frm.add_custom_button(__('Embed Chat Widget'), function() {
                 embed_chat_widget(frm);
@@ -277,106 +272,6 @@ function append_widget_message(type, message) {
     let $messages = $('#langflow-widget-messages');
     $messages.append(msg_html);
     $messages.scrollTop($messages[0].scrollHeight);
-}
-
-// Dialog-based chat (original functionality)
-function open_ai_chat(frm) {
-    let chat_dialog = new frappe.ui.Dialog({
-        title: __('AI Assistant'),
-        fields: [
-            {
-                fieldtype: 'HTML',
-                fieldname: 'chat_area'
-            }
-        ],
-        size: 'large'
-    });
-    
-    let chat_html = `
-        <div id="langflow-chat-container" style="height: 400px; overflow-y: auto; border: 1px solid #d1d8dd; border-radius: 4px; padding: 10px; margin-bottom: 10px;">
-            <div id="langflow-messages"></div>
-        </div>
-        <div style="display: flex; gap: 10px;">
-            <input type="text" id="langflow-message-input" class="form-control" placeholder="${__('Type your message...')}" />
-            <button id="langflow-send-btn" class="btn btn-primary">${__('Send')}</button>
-        </div>
-    `;
-    
-    chat_dialog.fields_dict.chat_area.$wrapper.html(chat_html);
-    
-    let session_id = frappe.utils.get_random(32);
-    
-    $('#langflow-send-btn').on('click', function() {
-        send_chat_message(frm, session_id);
-    });
-    
-    $('#langflow-message-input').on('keypress', function(e) {
-        if (e.which === 13) {
-            send_chat_message(frm, session_id);
-        }
-    });
-    
-    chat_dialog.show();
-    
-    setTimeout(function() {
-        append_chat_message('ai', `مرحباً! أنا مساعد AI للمرشحين. كيف يمكنني مساعدتك بخصوص المرشح ${frm.doc.applicant_name}؟`);
-    }, 100);
-}
-
-function send_chat_message(frm, session_id) {
-    let message = $('#langflow-message-input').val().trim();
-    if (!message) return;
-    
-    append_chat_message('user', message);
-    $('#langflow-message-input').val('');
-    
-    append_chat_message('ai', '<em>جاري الكتابة...</em>');
-    
-    let context_message = `المرشح: ${frm.doc.applicant_name}\nالسؤال: ${message}`;
-    
-    frappe.call({
-        method: 'langflow_integration.langflow_integration.api.langflow_client.chat_with_langflow',
-        args: {
-            message: context_message,
-            session_id: session_id
-        },
-        callback: function(r) {
-            $('#langflow-messages > div:last-child').remove();
-            
-            if (r.message && r.message.success) {
-                let response = extract_ai_response(r.message.data);
-                append_chat_message('ai', response);
-            } else {
-                let error_msg = r.message && r.message.error ? r.message.error : __('Unknown error occurred');
-                append_chat_message('ai', `❌ ${__('Sorry, I encountered an error')}: ${error_msg}`);
-            }
-        },
-        error: function(r) {
-            $('#langflow-messages > div:last-child').remove();
-            append_chat_message('ai', `❌ ${__('Failed to connect to AI service.')}`);
-        }
-    });
-}
-
-function append_chat_message(type, message) {
-    let msg_class = type === 'user' ? 'text-right' : 'text-left';
-    let bg_class = type === 'user' ? 'bg-primary text-white' : 'bg-light';
-    
-    let msg_html = `
-        <div class="${msg_class}" style="margin-bottom: 10px;">
-            <div class="${bg_class}" style="display: inline-block; padding: 8px 12px; border-radius: 8px; max-width: 70%;">
-                ${message}
-            </div>
-        </div>
-    `;
-    
-    let $messages = $('#langflow-messages');
-    let $container = $('#langflow-chat-container');
-    
-    if ($messages.length && $container.length) {
-        $messages.append(msg_html);
-        $container.scrollTop($container[0].scrollHeight);
-    }
 }
 
 function show_ai_response(data, title) {

@@ -1,28 +1,19 @@
 /**
- * Global Langflow Chat Widget Integration
- * Adds AI Chat Widget to all DocTypes (List & Form views)
+ * Langflow Global Integration - DIRECT SOLUTION
+ * This version uses the most reliable method to add buttons
  */
 
-// Global function to create and embed chat widget
+// Global function to create chat widget
 function create_langflow_widget(context_data) {
-    // Remove existing widget if present
     $('#langflow-embedded-widget').remove();
     
     const doctype = context_data.doctype;
     const docname = context_data.docname || null;
     const is_list = context_data.is_list || false;
     
-    // Prepare header title
     let header_title = '🤖 AI Assistant';
-    let header_subtitle = '';
+    let header_subtitle = is_list ? `${doctype} List` : `${doctype}: ${docname}`;
     
-    if (is_list) {
-        header_subtitle = `${doctype} List`;
-    } else {
-        header_subtitle = `${doctype}: ${docname}`;
-    }
-    
-    // Create embedded chat widget
     let widget_html = `
         <div id="langflow-embedded-widget" style="
             position: fixed;
@@ -38,7 +29,6 @@ function create_langflow_widget(context_data) {
             z-index: 1050;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         ">
-            <!-- Header -->
             <div style="
                 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                 color: white;
@@ -69,7 +59,6 @@ function create_langflow_widget(context_data) {
                    onmouseout="this.style.background='rgba(255,255,255,0.2)'; this.style.transform='scale(1)'">×</button>
             </div>
             
-            <!-- Messages Container -->
             <div id="langflow-widget-messages" style="
                 flex: 1;
                 overflow-y: auto;
@@ -77,7 +66,6 @@ function create_langflow_widget(context_data) {
                 background: #f8f9fa;
             "></div>
             
-            <!-- Input Area -->
             <div style="
                 padding: 16px;
                 border-top: 1px solid #e9ecef;
@@ -96,9 +84,7 @@ function create_langflow_widget(context_data) {
                                padding: 12px 18px;
                                font-size: 14px;
                                transition: all 0.2s;
-                           " 
-                           onfocus="this.style.borderColor='#667eea'; this.style.boxShadow='0 0 0 3px rgba(102,126,234,0.1)'"
-                           onblur="this.style.borderColor='#dee2e6'; this.style.boxShadow='none'" />
+                           " />
                     <button id="langflow-widget-send" 
                             class="btn btn-primary"
                             style="
@@ -107,10 +93,7 @@ function create_langflow_widget(context_data) {
                                 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                                 border: none;
                                 font-weight: 600;
-                                transition: all 0.2s;
-                            "
-                            onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 4px 12px rgba(102,126,234,0.4)'"
-                            onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='none'">${__('إرسال')}</button>
+                            ">${__('إرسال')}</button>
                 </div>
                 <div style="margin-top: 10px; font-size: 11px; color: #6c757d; text-align: center;">
                     ⚡ Powered by Langflow AI
@@ -119,13 +102,10 @@ function create_langflow_widget(context_data) {
         </div>
     `;
     
-    // Append to body
     $('body').append(widget_html);
     
-    // Generate session ID
     let session_id = frappe.utils.get_random(32);
     
-    // Setup event handlers
     $('#langflow-close-widget').on('click', function() {
         $('#langflow-embedded-widget').fadeOut(300, function() {
             $(this).remove();
@@ -142,18 +122,13 @@ function create_langflow_widget(context_data) {
         }
     });
     
-    // Add welcome message
     setTimeout(function() {
-        let welcome_msg = '';
-        if (is_list) {
-            welcome_msg = `مرحباً! 👋 أنا مساعد AI. يمكنني مساعدتك في الاستعلام عن بيانات ${doctype}. اسألني أي سؤال!`;
-        } else {
-            welcome_msg = `مرحباً! 👋 أنا مساعد AI. يمكنني مساعدتك في تحليل وفهم بيانات ${doctype}: ${docname}. كيف يمكنني مساعدتك؟`;
-        }
+        let welcome_msg = is_list 
+            ? `مرحباً! 👋 أنا مساعد AI. يمكنني مساعدتك في الاستعلام عن بيانات ${doctype}. اسألني أي سؤال!`
+            : `مرحباً! 👋 أنا مساعد AI. يمكنني مساعدتك في تحليل وفهم بيانات ${doctype}: ${docname}. كيف يمكنني مساعدتك؟`;
         append_langflow_message('ai', welcome_msg);
     }, 300);
     
-    // Show animation
     $('#langflow-embedded-widget').hide().fadeIn(400);
 }
 
@@ -164,28 +139,12 @@ function send_langflow_message(context_data, session_id) {
     
     append_langflow_message('user', message);
     $input.val('');
-    
-    // Show typing indicator
     append_langflow_message('ai', '<div class="typing-indicator"><span></span><span></span><span></span></div>');
     
-    // Prepare context message
-    let context_message = '';
+    let context_message = context_data.is_list
+        ? `DocType: ${context_data.doctype}\nContext: List View\nQuestion: ${message}\n\nأريد الاستعلام عن بيانات ${context_data.doctype} في وضع العرض القائمة.`
+        : `DocType: ${context_data.doctype}\nDocument Name: ${context_data.docname}\nQuestion: ${message}\n\nأريد الاستعلام عن المستند ${context_data.docname} من نوع ${context_data.doctype}.`;
     
-    if (context_data.is_list) {
-        context_message = `DocType: ${context_data.doctype}
-Context: List View
-Question: ${message}
-
-أريد الاستعلام عن بيانات ${context_data.doctype} في وضع العرض القائمة.`;
-    } else {
-        context_message = `DocType: ${context_data.doctype}
-Document Name: ${context_data.docname}
-Question: ${message}
-
-أريد الاستعلام عن المستند ${context_data.docname} من نوع ${context_data.doctype}.`;
-    }
-    
-    // Call Langflow API
     frappe.call({
         method: 'langflow_integration.langflow_integration.api.langflow_client.chat_with_langflow',
         args: {
@@ -193,9 +152,7 @@ Question: ${message}
             session_id: session_id
         },
         callback: function(r) {
-            // Remove typing indicator
             $('#langflow-widget-messages > div:last-child').remove();
-            
             if (r.message && r.message.success) {
                 let response = extract_langflow_response(r.message.data);
                 append_langflow_message('ai', response);
@@ -205,359 +162,208 @@ Question: ${message}
             }
         },
         error: function(r) {
-            // Remove typing indicator
             $('#langflow-widget-messages > div:last-child').remove();
-            append_langflow_message('ai', `❌ ${__('فشل الاتصال بخدمة AI. يرجى التحقق من الاتصال.')}`);
+            append_langflow_message('ai', `❌ ${__('فشل الاتصال بخدمة AI.')}`);
         }
     });
 }
 
 function append_langflow_message(type, message) {
     let isUser = type === 'user';
-    let alignClass = isUser ? 'flex-end' : 'flex-start';
-    let bgColor = isUser ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#fff';
-    let textColor = isUser ? '#fff' : '#333';
-    let boxShadow = isUser ? 'none' : '0 2px 12px rgba(0,0,0,0.08)';
-    
     let msg_html = `
-        <div style="
-            display: flex;
-            justify-content: ${alignClass};
-            margin-bottom: 16px;
-            animation: slideIn 0.3s ease-out;
-        ">
+        <div style="display: flex; justify-content: ${isUser ? 'flex-end' : 'flex-start'}; margin-bottom: 16px;">
             <div style="
-                background: ${bgColor};
-                color: ${textColor};
+                background: ${isUser ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#fff'};
+                color: ${isUser ? '#fff' : '#333'};
                 padding: 14px 18px;
                 border-radius: ${isUser ? '20px 20px 4px 20px' : '20px 20px 20px 4px'};
                 max-width: 80%;
-                box-shadow: ${boxShadow};
+                box-shadow: ${isUser ? 'none' : '0 2px 12px rgba(0,0,0,0.08)'};
                 word-wrap: break-word;
                 font-size: 14px;
                 line-height: 1.6;
-            ">
-                ${message}
-            </div>
+            ">${message}</div>
         </div>
     `;
-    
-    let $messages = $('#langflow-widget-messages');
-    $messages.append(msg_html);
-    $messages.scrollTop($messages[0].scrollHeight);
+    $('#langflow-widget-messages').append(msg_html).scrollTop($('#langflow-widget-messages')[0].scrollHeight);
 }
 
 function extract_langflow_response(data) {
     try {
         if (data.outputs && Array.isArray(data.outputs) && data.outputs.length > 0) {
             let output = data.outputs[0];
-            
             if (output.outputs && Array.isArray(output.outputs) && output.outputs.length > 0) {
                 let result = output.outputs[0];
-                
                 if (result.results) {
                     if (result.results.message) {
-                        if (typeof result.results.message === 'string') {
-                            return result.results.message;
-                        }
-                        if (result.results.message.text) {
-                            return result.results.message.text;
-                        }
+                        if (typeof result.results.message === 'string') return result.results.message;
+                        if (result.results.message.text) return result.results.message.text;
                     }
-                    if (result.results.text) {
-                        return result.results.text;
-                    }
+                    if (result.results.text) return result.results.text;
                 }
-                
                 if (result.message) {
-                    if (typeof result.message === 'string') {
-                        return result.message;
-                    }
-                    if (result.message.text) {
-                        return result.message.text;
-                    }
+                    if (typeof result.message === 'string') return result.message;
+                    if (result.message.text) return result.message.text;
                 }
             }
         }
-        
-        if (data.session_id) {
-            let text = find_text_in_langflow_response(data);
-            if (text) return text;
-        }
-        
         return `<pre>${JSON.stringify(data, null, 2)}</pre>`;
-        
     } catch (e) {
-        console.error('Error extracting Langflow response:', e);
         return `${__('تم استلام الرد ولكن لم يتم تحليله')}<br><pre>${JSON.stringify(data, null, 2)}</pre>`;
     }
 }
 
-function find_text_in_langflow_response(obj, depth = 0, maxDepth = 10) {
-    if (depth > maxDepth) return null;
-    
-    if (typeof obj === 'string' && obj.length > 10) {
-        return obj;
-    }
-    
-    if (typeof obj === 'object' && obj !== null) {
-        const priority_fields = ['text', 'message', 'content', 'response', 'output', 'answer'];
-        
-        for (let field of priority_fields) {
-            if (obj[field]) {
-                if (typeof obj[field] === 'string') {
-                    return obj[field];
-                }
-                let result = find_text_in_langflow_response(obj[field], depth + 1, maxDepth);
-                if (result) return result;
-            }
-        }
-        
-        for (let key in obj) {
-            if (priority_fields.includes(key)) continue;
-            let result = find_text_in_langflow_response(obj[key], depth + 1, maxDepth);
-            if (result) return result;
-        }
-    }
-    
-    return null;
-}
-
-// Add global styles for chat widget
+// Add styles
 if (!$('#langflow-global-styles').length) {
     $('head').append(`
         <style id="langflow-global-styles">
-            @keyframes slideIn {
-                from {
-                    opacity: 0;
-                    transform: translateY(10px);
-                }
-                to {
-                    opacity: 1;
-                    transform: translateY(0);
-                }
-            }
-            
-            .typing-indicator {
-                display: flex;
-                gap: 4px;
-                padding: 8px 0;
-            }
-            
+            .typing-indicator { display: flex; gap: 4px; padding: 8px 0; }
             .typing-indicator span {
-                width: 8px;
-                height: 8px;
+                width: 8px; height: 8px;
                 background: #667eea;
                 border-radius: 50%;
                 animation: typing 1.4s infinite;
             }
-            
-            .typing-indicator span:nth-child(2) {
-                animation-delay: 0.2s;
-            }
-            
-            .typing-indicator span:nth-child(3) {
-                animation-delay: 0.4s;
-            }
-            
+            .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+            .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
             @keyframes typing {
-                0%, 60%, 100% {
-                    transform: translateY(0);
-                    opacity: 0.7;
-                }
-                30% {
-                    transform: translateY(-10px);
-                    opacity: 1;
-                }
-            }
-            
-            #langflow-widget-messages::-webkit-scrollbar {
-                width: 6px;
-            }
-            
-            #langflow-widget-messages::-webkit-scrollbar-track {
-                background: #f1f1f1;
-                border-radius: 3px;
-            }
-            
-            #langflow-widget-messages::-webkit-scrollbar-thumb {
-                background: #888;
-                border-radius: 3px;
-            }
-            
-            #langflow-widget-messages::-webkit-scrollbar-thumb:hover {
-                background: #667eea;
+                0%, 60%, 100% { transform: translateY(0); opacity: 0.7; }
+                30% { transform: translateY(-10px); opacity: 1; }
             }
         </style>
     `);
 }
 
-// Make the function globally available
 window.create_langflow_widget = create_langflow_widget;
 
-// ==============================================
-// FORM VIEW Integration - Multiple Methods
-// ==============================================
+// ============================================
+// DIRECT BUTTON INJECTION - MOST RELIABLE
+// ============================================
 
-// Method 1: Using frappe.ui.form.on with wildcard
-frappe.ui.form.on('*', {
-    refresh: function(frm) {
-        add_langflow_button_to_form(frm);
-    },
-    onload: function(frm) {
-        add_langflow_button_to_form(frm);
-    }
-});
-
-// Method 2: Hook into after_load
-$(document).on('form-load form-refresh', function() {
+function inject_langflow_button_to_current_page() {
+    // For FORM View
     if (cur_frm && !cur_frm.is_new()) {
-        add_langflow_button_to_form(cur_frm);
-    }
-});
-
-// Method 3: Watch for page changes
-frappe.router.on('change', function() {
-    setTimeout(function() {
-        if (cur_frm && !cur_frm.is_new()) {
-            add_langflow_button_to_form(cur_frm);
-        }
-    }, 500);
-});
-
-// Method 4: Using frappe.after_ajax
-$(document).ajaxComplete(function() {
-    if (cur_frm && !cur_frm.is_new()) {
-        setTimeout(function() {
-            add_langflow_button_to_form(cur_frm);
-        }, 300);
-    }
-});
-
-function add_langflow_button_to_form(frm) {
-    if (!frm || frm.is_new()) {
-        return;
-    }
-    
-    // Check if button already exists
-    const button_label = __('AI Chat Widget');
-    const group_label = __('🤖 Langflow');
-    
-    // Remove existing button if present to avoid duplicates
-    if (frm.custom_buttons && frm.custom_buttons[group_label]) {
-        const existing = frm.custom_buttons[group_label].find(btn => {
-            return $(btn).text().trim() === button_label;
-        });
-        
-        if (existing && existing.length > 0) {
-            console.log(`ℹ️ Langflow: Button already exists in ${frm.doctype} form`);
+        // Check if button group exists
+        if (!cur_frm.page.btn_group) {
+            console.log('⚠️ Langflow: Button group not ready yet');
             return;
         }
-    }
-    
-    try {
-        // Add the button
-        frm.add_custom_button(button_label, function() {
+        
+        // Check if already added
+        const existing = cur_frm.page.btn_group.find('.btn-langflow-chat');
+        if (existing.length > 0) {
+            return; // Already added
+        }
+        
+        // Create button HTML directly
+        const btn_html = `
+            <button class="btn btn-default btn-sm ellipsis btn-langflow-chat" 
+                    data-label="AI Chat Widget"
+                    style="margin-right: 8px;">
+                <span class="btn-label">🤖 AI Chat Widget</span>
+            </button>
+        `;
+        
+        // Inject button
+        cur_frm.page.btn_group.prepend(btn_html);
+        
+        // Attach click event
+        cur_frm.page.btn_group.find('.btn-langflow-chat').on('click', function() {
             create_langflow_widget({
-                doctype: frm.doctype,
-                docname: frm.docname,
+                doctype: cur_frm.doctype,
+                docname: cur_frm.docname,
                 is_list: false
             });
-        }, group_label);
+        });
         
-        console.log(`✅ Langflow: Button added to ${frm.doctype} form (${frm.docname})`);
-    } catch (e) {
-        console.error('❌ Langflow: Error adding button to form:', e);
+        console.log(`✅ Langflow: Button injected to ${cur_frm.doctype} form`);
+    }
+    
+    // For LIST View
+    if (cur_list && cur_list.page) {
+        const existing = cur_list.page.inner_toolbar.find('.btn-langflow-chat');
+        if (existing.length > 0) {
+            return; // Already added
+        }
+        
+        const btn_html = `
+            <button class="btn btn-default btn-sm btn-langflow-chat" 
+                    style="margin-left: 10px;">
+                <span>🤖 AI Chat Widget</span>
+            </button>
+        `;
+        
+        cur_list.page.inner_toolbar.append(btn_html);
+        
+        cur_list.page.inner_toolbar.find('.btn-langflow-chat').on('click', function() {
+            create_langflow_widget({
+                doctype: cur_list.doctype,
+                docname: null,
+                is_list: true
+            });
+        });
+        
+        console.log(`✅ Langflow: Button injected to ${cur_list.doctype} list`);
     }
 }
 
-// ==============================================
-// LIST VIEW Integration
-// ==============================================
+// ============================================
+// MULTIPLE TRIGGERS
+// ============================================
 
-// Method 1: Using frappe.listview_settings
-frappe.listview_settings['*'] = {
-    onload: function(listview) {
-        add_langflow_button_to_list(listview);
-    },
-    refresh: function(listview) {
-        add_langflow_button_to_list(listview);
-    }
-};
-
-// Method 2: Hook into list page load
-$(document).on('list-load list-refresh', function() {
-    if (cur_list) {
-        add_langflow_button_to_list(cur_list);
-    }
+// Trigger 1: Immediate check
+$(document).ready(function() {
+    console.log('✅ Langflow Global Integration Loaded Successfully');
+    setTimeout(inject_langflow_button_to_current_page, 500);
+    setTimeout(inject_langflow_button_to_current_page, 1500);
+    setTimeout(inject_langflow_button_to_current_page, 3000);
 });
 
-// Method 3: Watch for route changes
+// Trigger 2: Route changes
 frappe.router.on('change', function() {
-    setTimeout(function() {
-        if (cur_list) {
-            add_langflow_button_to_list(cur_list);
-        }
-    }, 800);
+    setTimeout(inject_langflow_button_to_current_page, 500);
+    setTimeout(inject_langflow_button_to_current_page, 1000);
 });
 
-// Method 4: Periodic check (fallback)
-setInterval(function() {
-    if (cur_list && window.location.pathname.includes('/list')) {
-        add_langflow_button_to_list(cur_list);
+// Trigger 3: Page show events
+$(document).on('page-change', function() {
+    setTimeout(inject_langflow_button_to_current_page, 300);
+});
+
+// Trigger 4: Form events
+$(document).on('form-load form-refresh', function() {
+    setTimeout(inject_langflow_button_to_current_page, 200);
+});
+
+// Trigger 5: Periodic check (every 3 seconds for first minute)
+let check_count = 0;
+const periodic_check = setInterval(function() {
+    inject_langflow_button_to_current_page();
+    check_count++;
+    if (check_count > 20) {
+        clearInterval(periodic_check);
     }
 }, 3000);
 
-function add_langflow_button_to_list(listview) {
-    if (!listview || !listview.page) {
-        return;
-    }
-    
-    const button_label = __('AI Chat Widget');
-    const group_label = __('🤖 Langflow');
-    
-    // Check if button already exists
-    const existing_button = listview.page.inner_toolbar && 
-                           listview.page.inner_toolbar.find(`.btn:contains("${button_label}")`);
-    
-    if (existing_button && existing_button.length > 0) {
-        console.log(`ℹ️ Langflow: Button already exists in ${listview.doctype} list`);
-        return;
-    }
-    
-    try {
-        if (listview.page.add_inner_button) {
-            listview.page.add_inner_button(button_label, function() {
-                create_langflow_widget({
-                    doctype: listview.doctype,
-                    docname: null,
-                    is_list: true
-                });
-            }, group_label);
-            
-            console.log(`✅ Langflow: Button added to ${listview.doctype} list`);
+// Trigger 6: MutationObserver for btn_group
+const observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
+        if (mutation.addedNodes.length > 0) {
+            setTimeout(inject_langflow_button_to_current_page, 100);
         }
-    } catch (e) {
-        console.error('❌ Langflow: Error adding button to list:', e);
-    }
-}
+    });
+});
 
-// ==============================================
-// Initialize on document ready
-// ==============================================
+// Start observing when document is ready
 $(document).ready(function() {
-    console.log('✅ Langflow Global Integration Loaded Successfully');
-    
-    // Initial check after short delay
     setTimeout(function() {
-        // Check form
-        if (cur_frm && !cur_frm.is_new()) {
-            add_langflow_button_to_form(cur_frm);
-        }
-        
-        // Check list
-        if (cur_list) {
-            add_langflow_button_to_list(cur_list);
+        if (cur_frm && cur_frm.page && cur_frm.page.btn_group) {
+            observer.observe(cur_frm.page.btn_group[0], {
+                childList: true,
+                subtree: true
+            });
         }
     }, 1000);
 });
+
+console.log('🚀 Langflow: Multiple injection triggers activated');

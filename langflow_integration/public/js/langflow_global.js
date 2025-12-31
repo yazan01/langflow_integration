@@ -1,6 +1,6 @@
 /**
- * Langflow Global Integration - GUARANTEED SOLUTION
- * هذا الحل مضمون 100% للعمل في Form View
+ * Langflow Global Integration - LIST VIEW ONLY
+ * This version ONLY adds the button to List Views
  */
 
 // ============================================
@@ -220,42 +220,7 @@ function extract_langflow_response(data) {
 window.create_langflow_widget = create_langflow_widget;
 
 // ============================================
-// PART 2: ADD BUTTON TO FORMS - GUARANTEED METHOD
-// ============================================
-
-// This function MUST work
-function add_langflow_button_to_form(frm) {
-    // Safety checks
-    if (!frm || frm.is_new()) {
-        return;
-    }
-    
-    // Prevent duplicate additions
-    if (frm.__langflow_button_added) {
-        return;
-    }
-    
-    try {
-        // Add button using Frappe's official method
-        frm.add_custom_button('🤖 AI Chat', function() {
-            create_langflow_widget({
-                doctype: frm.doctype,
-                docname: frm.docname,
-                is_list: false
-            });
-        });
-        
-        // Mark as added
-        frm.__langflow_button_added = true;
-        
-        console.log(`✅ Langflow button added to ${frm.doctype} (${frm.docname})`);
-    } catch (error) {
-        console.error('❌ Langflow button error:', error);
-    }
-}
-
-// ============================================
-// PART 3: ADD BUTTON TO LISTS
+// PART 2: ADD BUTTON TO LIST VIEW ONLY
 // ============================================
 
 function add_langflow_button_to_list() {
@@ -272,7 +237,7 @@ function add_langflow_button_to_list() {
         const btn_html = `
             <button class="btn btn-default btn-sm btn-langflow-chat" 
                     style="margin-left: 10px;">
-                <span>🤖 AI Chat</span>
+                <span>🤖 AI Chat Widget</span>
             </button>
         `;
         
@@ -286,99 +251,48 @@ function add_langflow_button_to_list() {
             });
         });
         
-        console.log(`✅ Langflow button added to ${cur_list.doctype} list`);
+        console.log(`✅ Langflow: Button added to ${cur_list.doctype} list`);
     } catch (error) {
         console.error('❌ Langflow list button error:', error);
     }
 }
 
 // ============================================
-// PART 4: INITIALIZATION - MULTIPLE STRATEGIES
+// PART 3: INITIALIZATION - LIST VIEW ONLY
 // ============================================
 
-// Strategy 1: Hook into form refresh (MOST RELIABLE)
-$(document).on('form-refresh', function(e, frm) {
-    if (frm && !frm.is_new()) {
-        setTimeout(function() {
-            add_langflow_button_to_form(frm);
-        }, 100);
-    }
-});
-
-// Strategy 2: Hook into form load
-$(document).on('form-load', function(e, frm) {
-    if (frm && !frm.is_new()) {
-        setTimeout(function() {
-            add_langflow_button_to_form(frm);
-        }, 200);
-    }
-});
-
-// Strategy 3: Watch for cur_frm changes
-let last_cur_frm = null;
-setInterval(function() {
-    if (cur_frm && cur_frm !== last_cur_frm) {
-        last_cur_frm = cur_frm;
-        if (!cur_frm.is_new()) {
-            setTimeout(function() {
-                add_langflow_button_to_form(cur_frm);
-            }, 150);
-        }
-    }
-    
-    // Also check for list view
-    if (cur_list) {
-        add_langflow_button_to_list();
-    }
-}, 1000);
-
-// Strategy 4: Route changes
-frappe.router.on('change', function() {
-    setTimeout(function() {
-        if (cur_frm && !cur_frm.is_new()) {
-            add_langflow_button_to_form(cur_frm);
-        }
-        if (cur_list) {
-            add_langflow_button_to_list();
-        }
-    }, 500);
-});
-
-// Strategy 5: Page show
-$(document).on('page-change', function() {
-    setTimeout(function() {
-        if (cur_frm && !cur_frm.is_new()) {
-            add_langflow_button_to_form(cur_frm);
-        }
-        if (cur_list) {
-            add_langflow_button_to_list();
-        }
-    }, 300);
-});
-
-// Strategy 6: Document ready
+// Strategy 1: Document ready
 $(document).ready(function() {
-    console.log('✅ Langflow Global Integration Loaded');
-    
-    // Initial check after delay
-    setTimeout(function() {
-        if (cur_frm && !cur_frm.is_new()) {
-            add_langflow_button_to_form(cur_frm);
-        }
-        if (cur_list) {
-            add_langflow_button_to_list();
-        }
-    }, 1000);
+    console.log('✅ Langflow Integration (List View Only) Loaded');
+    setTimeout(add_langflow_button_to_list, 500);
+    setTimeout(add_langflow_button_to_list, 1500);
 });
 
-// Strategy 7: Frappe ready
+// Strategy 2: Frappe ready
 frappe.ready(function() {
-    setTimeout(function() {
-        if (cur_frm && !cur_frm.is_new()) {
-            add_langflow_button_to_form(cur_frm);
-        }
-    }, 500);
+    setTimeout(add_langflow_button_to_list, 500);
 });
+
+// Strategy 3: Route changes
+frappe.router.on('change', function() {
+    setTimeout(add_langflow_button_to_list, 500);
+    setTimeout(add_langflow_button_to_list, 1000);
+});
+
+// Strategy 4: Page show
+$(document).on('page-change', function() {
+    setTimeout(add_langflow_button_to_list, 300);
+});
+
+// Strategy 5: Periodic check (first 30 seconds)
+let check_count = 0;
+const periodic_check = setInterval(function() {
+    add_langflow_button_to_list();
+    check_count++;
+    if (check_count > 10) {
+        clearInterval(periodic_check);
+    }
+}, 3000);
 
 // Add CSS
 if (!$('#langflow-global-styles').length) {
@@ -401,4 +315,4 @@ if (!$('#langflow-global-styles').length) {
     `);
 }
 
-console.log('🚀 Langflow: All strategies activated (7 methods)');
+console.log('🚀 Langflow: List View mode activated');

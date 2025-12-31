@@ -10,9 +10,6 @@
 function create_langflow_widget(context_data) {
     $('#langflow-embedded-widget').remove();
     
-    // Reset message flag for new conversation
-    window.__langflow_message_sent = false;
-    
     const doctype = context_data.doctype;
     const docname = context_data.docname || null;
     const is_list = context_data.is_list || false;
@@ -147,12 +144,6 @@ function send_langflow_message(context_data, session_id) {
     $input.val('');
     append_langflow_message('ai', '<div class="typing-indicator"><span></span><span></span><span></span></div>');
     
-    // تحديد إذا كانت هذه أول رسالة
-    let is_first_message = !window.__langflow_message_sent;
-    if (is_first_message) {
-        window.__langflow_message_sent = true;
-    }
-    
     let context_message = context_data.is_list
         ? `DocType: ${context_data.doctype}\nContext: List View\nQuestion: ${message}\n\nأريد الاستعلام عن بيانات ${context_data.doctype} في وضع العرض القائمة.`
         : `DocType: ${context_data.doctype}\nDocument Name: ${context_data.docname}\nQuestion: ${message}\n\nأريد الاستعلام عن المستند ${context_data.docname} من نوع ${context_data.doctype}.`;
@@ -161,9 +152,7 @@ function send_langflow_message(context_data, session_id) {
         method: 'langflow_integration.langflow_integration.api.langflow_client.chat_with_langflow',
         args: {
             message: context_message,
-            session_id: session_id,
-            doctype: context_data.doctype,
-            is_first_message: is_first_message  // ← إرسال flag
+            session_id: session_id
         },
         callback: function(r) {
             $('#langflow-widget-messages > div:last-child').remove();

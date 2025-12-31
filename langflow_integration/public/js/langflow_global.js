@@ -152,7 +152,8 @@ function send_langflow_message(context_data, session_id) {
         method: 'langflow_integration.langflow_integration.api.langflow_client.chat_with_langflow',
         args: {
             message: context_message,
-            session_id: session_id
+            session_id: session_id,
+            doctype: context_data.doctype
         },
         callback: function(r) {
             $('#langflow-widget-messages > div:last-child').remove();

@@ -395,54 +395,129 @@ if (!$('#langflow-global-styles').length) {
 // ==============================================
 // FORM VIEW Integration
 // ==============================================
-frappe.ui.form.on('*', {
-    refresh: function(frm) {
-        if (!frm.is_new()) {
-            // Add AI Chat button to all forms
-            frm.add_custom_button(__('AI Chat Widget'), function() {
-                create_langflow_widget({
-                    doctype: frm.doctype,
-                    docname: frm.docname,
-                    is_list: false
-                });
-            }, __('🤖 Langflow'));
-        }
-    }
+$(document).on('app_ready', function() {
+    console.log('🚀 Langflow: Initializing Form View Integration...');
+    
+    // Override form refresh for all doctypes
+    const original_setup = frappe.ui.form.Form.prototype.setup;
+    frappe.ui.form.Form.prototype.setup = function() {
+        original_setup.apply(this, arguments);
+        const frm = this;
+        
+        // Add custom setup for Langflow button
+        frm.events = frm.events || {};
+        const original_refresh = frm.events.refresh;
+        
+        frm.events.refresh = function(frm_obj) {
+            if (original_refresh) {
+                original_refresh(frm_obj);
+            }
+            
+            // Add AI Chat Widget button if not new
+            if (!frm_obj.is_new()) {
+                // Remove existing button if present
+                frm_obj.page.remove_inner_button(__('AI Chat Widget'), __('🤖 Langflow'));
+                
+                // Add the button
+                frm_obj.add_custom_button(__('AI Chat Widget'), function() {
+                    create_langflow_widget({
+                        doctype: frm_obj.doctype,
+                        docname: frm_obj.docname,
+                        is_list: false
+                    });
+                }, __('🤖 Langflow'));
+                
+                console.log(`✅ Langflow button added to ${frm_obj.doctype} form`);
+            }
+        };
+    };
 });
 
 // ==============================================
 // LIST VIEW Integration
 // ==============================================
-frappe.listview_settings['*'] = {
-    onload: function(listview) {
-        // Add AI Chat button to list toolbar
-        listview.page.add_inner_button(__('AI Chat Widget'), function() {
-            create_langflow_widget({
-                doctype: listview.doctype,
-                docname: null,
-                is_list: true
-            });
-        }, __('🤖 Langflow'));
+$(document).on('app_ready', function() {
+    console.log('🚀 Langflow: Initializing List View Integration...');
+    
+    // Method 1: Override ListView setup
+    if (frappe.views && frappe.views.ListView) {
+        const original_setup_defaults = frappe.views.ListView.prototype.setup_defaults;
+        frappe.views.ListView.prototype.setup_defaults = function() {
+            original_setup_defaults.apply(this, arguments);
+            
+            // Add button after a small delay to ensure page is ready
+            const listview = this;
+            setTimeout(function() {
+                add_langflow_button_to_list(listview);
+            }, 500);
+        };
     }
-};
-
-// Alternative method: Override frappe.views.ListView to add button to all lists
-$(document).ready(function() {
-    // Wait for page to load, then add button to any existing list views
+    
+    // Method 2: Watch for list page changes
+    frappe.router.on('change', function() {
+        setTimeout(function() {
+            if (cur_list) {
+                add_langflow_button_to_list(cur_list);
+            }
+        }, 1000);
+    });
+    
+    // Method 3: Initial check after app is ready
     setTimeout(function() {
-        if (cur_list && cur_list.doctype) {
-            // Check if button doesn't already exist
-            if (!cur_list.page.inner_toolbar.find('.btn:contains("AI Chat Widget")').length) {
-                cur_list.page.add_inner_button(__('AI Chat Widget'), function() {
-                    create_langflow_widget({
-                        doctype: cur_list.doctype,
-                        docname: null,
-                        is_list: true
-                    });
-                }, __('🤖 Langflow'));
+        if (cur_list) {
+            add_langflow_button_to_list(cur_list);
+        }
+    }, 1500);
+});
+
+function add_langflow_button_to_list(listview) {
+    if (!listview || !listview.page) {
+        console.log('⚠️ Langflow: List view or page not available');
+        return;
+    }
+    
+    // Check if button already exists
+    const existing_button = listview.page.btn_group && 
+                           listview.page.btn_group.find('.btn:contains("AI Chat Widget")');
+    
+    if (existing_button && existing_button.length > 0) {
+        console.log('ℹ️ Langflow: Button already exists in list view');
+        return;
+    }
+    
+    try {
+        // Try to add using add_inner_button
+        if (listview.page.add_inner_button) {
+            listview.page.add_inner_button(__('AI Chat Widget'), function() {
+                create_langflow_widget({
+                    doctype: listview.doctype,
+                    docname: null,
+                    is_list: true
+                });
+            }, __('🤖 Langflow'));
+            
+            console.log(`✅ Langflow button added to ${listview.doctype} list view`);
+        } else {
+            // Fallback: Add button manually
+            const btn_html = `
+                <button class="btn btn-default btn-sm" 
+                        onclick="create_langflow_widget({doctype: '${listview.doctype}', docname: null, is_list: true})"
+                        style="margin-left: 10px;">
+                    <span>🤖 ${__('AI Chat Widget')}</span>
+                </button>
+            `;
+            
+            if (listview.page.inner_toolbar) {
+                $(listview.page.inner_toolbar).append(btn_html);
+                console.log(`✅ Langflow button added manually to ${listview.doctype} list view`);
             }
         }
-    }, 1000);
-});
+    } catch (e) {
+        console.error('❌ Langflow: Error adding button to list view:', e);
+    }
+}
+
+// Make the function globally available
+window.create_langflow_widget = create_langflow_widget;
 
 console.log('✅ Langflow Global Integration Loaded Successfully');

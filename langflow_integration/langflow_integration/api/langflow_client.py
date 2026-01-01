@@ -283,49 +283,11 @@ Document Data:
         }
 
 
-# @frappe.whitelist()
-# def chat_with_langflow(message, flow_id=None, session_id=None, doctype):
-#     """
-#     محادثة بسيطة مع Langflow
-    
-#     Args:
-#         message: الرسالة النصية
-#         flow_id: معرف الـ Flow
-#         session_id: معرف الجلسة للحفاظ على السياق
-        
-#     Returns:
-#         dict: الرد من Langflow
-#     """
-#     try:
-#         if not flow_id:
-#             flow_id = frappe.conf.get("langflow_chat_flow_id")
-            
-#         if not flow_id:
-#             return {
-#                 "success": False,
-#                 "error": _("Chat flow ID not configured")
-#             }
-        
-#         result = call_langflow(
-#             flow_id=flow_id,
-#             input_data=message,
-#             session_id=session_id
-#         )
-        
-#         return result
-        
-#     except Exception as e:
-#         frappe.log_error(f"Chat Error: {str(e)}", "Langflow Integration")
-#         return {
-#             "success": False,
-#             "error": str(e)
-#         }
-
 @frappe.whitelist()
 def chat_with_langflow(message, flow_id=None, session_id=None, doctype=None):
     """
     Chat with Langflow
-    - Inject full DocType data on first message only
+    - Inject DocType Schema (metadata) on first message only
     - No permission checks
     """
 
@@ -359,27 +321,38 @@ def chat_with_langflow(message, flow_id=None, session_id=None, doctype=None):
             cache.set_value(cache_key, True, expires_in_sec=60 * 60)
 
             # ----------------------------------
-            # Fetch ALL data from table
+            # Get DocType Schema (Metadata)
             # ----------------------------------
-            data = frappe.get_all(
-                doctype,
-                fields="*",
-                filters={
-                    "docstatus": ["<", 2]
-                }
-            )
+            meta = frappe.get_meta(doctype)
+            output_lines = []
+            
+            # Parent DocType
+            output_lines.append(f"DocType: {meta.name} | Type: Parent")
+            for field in meta.fields:
+                output_lines.append(f"  - {field.fieldname} ({field.fieldtype})")
+            
+            # Child DocTypes
+            for field in meta.fields:
+                if field.fieldtype == "Table":
+                    child_meta = frappe.get_meta(field.options)
+                    output_lines.append(f"\nDocType: {child_meta.name} | Type: Child | Parent Field: {field.fieldname}")
+                    for f in child_meta.fields:
+                        output_lines.append(f"  - {f.fieldname} ({f.fieldtype})")
+            
+            # Convert to single string
+            schema_string = "\n".join(output_lines)
 
             context_prefix = f"""
 أنت مساعد ذكي متصل مباشرة بقاعدة بيانات ERPNext.
 
 السياق:
 - DocType: {doctype}
-- عدد السجلات: {len(data)}
 
-بيانات الجدول كاملة (JSON):
-{frappe.as_json(data, indent=2)}
+هيكل البيانات (Schema):
+{schema_string}
 
-استخدم هذه البيانات للإجابة بدقة على الأسئلة التالية.
+استخدم هذا الهيكل للإجابة بدقة على الأسئلة التالية.
+عندما يطلب المستخدم بيانات، استخدم الـ API أو الـ Tools المتاحة للاستعلام عن البيانات الفعلية.
 """
 
         # ----------------------------------
@@ -407,7 +380,6 @@ def chat_with_langflow(message, flow_id=None, session_id=None, doctype=None):
             "success": False,
             "error": str(e)
         }
-
 
 
 @frappe.whitelist()
@@ -496,4 +468,3 @@ def get_langflow_config():
             "success": False,
             "error": str(e)
         }
-

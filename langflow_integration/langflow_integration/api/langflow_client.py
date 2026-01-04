@@ -345,14 +345,9 @@ def chat_with_langflow(message, flow_id=None, session_id=None, doctype=None):
             context_prefix = f"""
 أنت مساعد ذكي متصل مباشرة بقاعدة بيانات ERPNext.
 
-السياق:
-- DocType: {doctype}
-
 هيكل البيانات (Schema):
 {schema_string}
 
-استخدم هذا الهيكل للإجابة بدقة على الأسئلة التالية.
-عندما يطلب المستخدم بيانات، استخدم الـ API أو الـ Tools المتاحة للاستعلام عن البيانات الفعلية.
 """
 
         # ----------------------------------
@@ -468,3 +463,4 @@ def get_langflow_config():
             "success": False,
             "error": str(e)
         }
+

@@ -244,7 +244,7 @@ def process_document_with_ai(doctype, docname, prompt, flow_id=None, include_fie
         
         # إزالة الحقول غير الضرورية
         fields_to_remove = [
-            'modified_by', 'owner', 'idx', 'docstatus',
+            'modified_by', 'owner', 'idx',
             '_user_tags', '_comments', '_assign', '_liked_by'
         ]
         for field in fields_to_remove:
@@ -316,7 +316,8 @@ def chat_with_langflow(message, flow_id=None, session_id=None, doctype=None):
         context_prefix = ""
         is_first_message = not cache.get_value(cache_key)
 
-        if is_first_message and doctype:
+        # if is_first_message and doctype:
+        if doctype:
             # Mark session as initialized
             cache.set_value(cache_key, True, expires_in_sec=60 * 60)
 
@@ -463,4 +464,5 @@ def get_langflow_config():
             "success": False,
             "error": str(e)
         }
+
 

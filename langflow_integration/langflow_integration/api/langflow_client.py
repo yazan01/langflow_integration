@@ -110,7 +110,7 @@ def call_langflow(flow_id, input_data, session_id=None, tweaks=None, timeout=30)
             frappe.throw(_("Please login to use this feature"))
         
         # إعدادات Langflow
-        langflow_url = frappe.conf.get("langflow_url") or "http://144.91.111.48:7860"
+        langflow_url = frappe.conf.get("langflow_url") or "http://localhost:7860"
         langflow_api_key = frappe.conf.get("langflow_api_key")
         
         if not flow_id:
@@ -387,7 +387,7 @@ def test_connection():
         dict: حالة الاتصال
     """
     try:
-        langflow_url = frappe.conf.get("langflow_url") or "http://144.91.111.48:7860"
+        langflow_url = frappe.conf.get("langflow_url") or "http://localhost:7860"
         
         # محاولة الوصول إلى صفحة الصحة
         response = requests.get(f"{langflow_url}/health", timeout=5)
@@ -448,7 +448,7 @@ def get_langflow_config():
             }
         
         config = {
-            "langflow_url": frappe.conf.get("langflow_url") or "http://144.91.111.48:7860",
+            "langflow_url": frappe.conf.get("langflow_url") or "http://localhost:7860",
             "api_key_configured": bool(frappe.conf.get("langflow_api_key")),
             "document_processor_id": frappe.conf.get("langflow_document_processor_id"),
             "chat_flow_id": frappe.conf.get("langflow_chat_flow_id")
@@ -464,6 +464,7 @@ def get_langflow_config():
             "success": False,
             "error": str(e)
         }
+
 
 
 

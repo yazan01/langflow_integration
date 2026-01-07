@@ -51,27 +51,49 @@ function extract_cv_with_ai(frm) {
     
     console.log('📄 Full CV Path:', full_path);
 
+    // الحصول على الـ Flow ID من الإعدادات
+    // جرب كل الطرق الممكنة
+    let cv_flow_id = null;
+    
+    if (frappe.boot.sysdefaults && frappe.boot.sysdefaults.langflow_cv_extract_flow_id) {
+        cv_flow_id = frappe.boot.sysdefaults.langflow_cv_extract_flow_id;
+    } else if (frappe.sys_defaults && frappe.sys_defaults.langflow_cv_extract_flow_id) {
+        cv_flow_id = frappe.sys_defaults.langflow_cv_extract_flow_id;
+    } else if (frappe.boot.langflow_cv_extract_flow_id) {
+        cv_flow_id = frappe.boot.langflow_cv_extract_flow_id;
+    }
+
+    console.log('🔑 Flow ID:', cv_flow_id);
+
+    // التحقق من وجود Flow ID
+    if (!cv_flow_id) {
+        frappe.msgprint({
+            title: __('Configuration Error'),
+            indicator: 'red',
+            message: __('Langflow CV Extract Flow ID is not configured.<br><br>Please add it to site_config.json:<br><code>"langflow_cv_extract_flow_id": "your-flow-id-here"</code>')
+        });
+        return;
+    }
+
     // عرض مؤشر التحميل
     frappe.show_alert({
         message: __('Extracting CV data with AI...'),
         indicator: 'blue'
     }, 3);
 
-    // الحصول على الـ Flow ID من الإعدادات
-    let cv_flow_id = frappe.boot.sysdefaults.langflow_cv_extract_flow_id || 
-                     frappe.sys_defaults.langflow_cv_extract_flow_id;
-
     // استدعاء Langflow مباشرة بالـ path فقط
     frappe.call({
         method: 'langflow_integration.langflow_integration.api.langflow_client.call_langflow',
         args: {
             flow_id: cv_flow_id,
-            input_data: full_path,  // إرسال الـ path فقط
+            input_data: full_path,
             session_id: null
         },
         freeze: true,
         freeze_message: __('AI is processing your CV...'),
         callback: function(r) {
+            console.log('📥 Response:', r);
+            
             if (r.message && r.message.success) {
                 frappe.show_alert({
                     message: __('CV extracted successfully!'),
@@ -81,18 +103,20 @@ function extract_cv_with_ai(frm) {
                 // عرض النتائج في dialog
                 show_cv_extraction_results(r.message.data, frm);
             } else {
+                let error_msg = (r.message && r.message.error) ? r.message.error : __('Unknown error occurred');
                 frappe.msgprint({
                     title: __('Extraction Failed'),
                     indicator: 'red',
-                    message: r.message.error || __('Unknown error occurred')
+                    message: error_msg
                 });
             }
         },
         error: function(r) {
+            console.error('❌ Error:', r);
             frappe.msgprint({
                 title: __('Error'),
                 indicator: 'red',
-                message: __('Failed to connect to AI service')
+                message: __('Failed to connect to AI service. Please check console for details.')
             });
         }
     });
@@ -124,6 +148,7 @@ function show_cv_extraction_results(data, frm) {
             extracted_text = JSON.stringify(data, null, 2);
         }
     } catch (e) {
+        console.error('Error parsing results:', e);
         extracted_text = JSON.stringify(data, null, 2);
     }
 

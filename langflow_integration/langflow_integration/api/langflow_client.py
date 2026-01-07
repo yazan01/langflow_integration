@@ -50,32 +50,21 @@ def extract_cv_data(applicant_name, cv_file_url, flow_id=None):
         # الحصول على مسار الملف الكامل
         file_path = frappe.get_site_path('public', cv_file_url.lstrip('/'))
         
-        # قراءة محتوى الملف
-        try:
-            import base64
-            with open(file_path, 'rb') as f:
-                file_content = base64.b64encode(f.read()).decode('utf-8')
-                file_extension = cv_file_url.split('.')[-1].lower()
-        except Exception as e:
-            frappe.log_error(f"File reading error: {str(e)}", "CV Extraction")
+        # التحقق من وجود الملف
+        import os
+        if not os.path.exists(file_path):
             return {
                 "success": False,
-                "error": _("Failed to read CV file: {0}").format(str(e))
+                "error": _("CV file not found at path: {0}").format(file_path)
             }
         
-        # تحضير البيانات
-        input_data = {
-            "applicant_name": applicant_name,
-            "file_url": cv_file_url,
-            "file_content": file_content,
-            "file_extension": file_extension,
-            "instruction": "Extract all relevant information from this CV/Resume including: personal information, education, work experience, skills, certifications, and languages."
-        }
+        # إرسال المسار الكامل فقط إلى Langflow
+        frappe.logger().info(f"Sending CV file path to Langflow: {file_path}")
         
-        # استدعاء Langflow
+        # استدعاء Langflow بالمسار فقط
         result = call_langflow(
             flow_id=flow_id,
-            input_data=json.dumps(input_data, ensure_ascii=False),
+            input_data=file_path,  # ✅ إرسال المسار فقط
             session_id=None
         )
         
@@ -87,7 +76,6 @@ def extract_cv_data(applicant_name, cv_file_url, flow_id=None):
             "success": False,
             "error": str(e)
         }
-
 
 @frappe.whitelist()
 def call_langflow(flow_id, input_data, session_id=None, tweaks=None, timeout=30):
@@ -464,6 +452,7 @@ def get_langflow_config():
             "success": False,
             "error": str(e)
         }
+
 
 
 

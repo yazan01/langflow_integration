@@ -55,7 +55,7 @@ def extract_cv_data(applicant_name, cv_file_url, flow_id=None):
         if file_url.startswith("/"):
             file_url = file_url[1:]
 
-        full_path = f"{base_path}/{file_url}"
+        fill_path = f"{base_path}/{file_url}"
         
         # التحقق من وجود الملف
         import os
@@ -459,6 +459,7 @@ def get_langflow_config():
             "success": False,
             "error": str(e)
         }
+
 
 
 

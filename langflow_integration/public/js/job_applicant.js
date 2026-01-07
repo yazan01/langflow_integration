@@ -1,4 +1,17 @@
 frappe.ui.form.on('Job Applicant', {
+    onload: function(frm) {
+        if (!frm.is_new()) {
+            // Add AI Extract CV button
+            frm.add_custom_button(__('AI Extract CV'), function() {
+                extract_cv_with_ai(frm);
+            }).css({
+                'background': 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                'color': 'white',
+                'border': 'none',
+                'font-weight': '600'
+            });
+        }
+    },
     refresh: function(frm) {
         if (!frm.is_new()) {
             // Add AI Extract CV button
@@ -25,6 +38,19 @@ function extract_cv_with_ai(frm) {
         return;
     }
 
+    // بناء المسار الكامل
+    let base_path = "/home/frappe/frappe-bench/sites/erpnext.ivalueconsult.com";
+    let file_url = frm.doc.resume_attachment;
+    
+    // إزالة / من البداية إذا كان موجود
+    if (file_url.startsWith('/')) {
+        file_url = file_url.substring(1);
+    }
+    
+    let full_path = base_path + "/" + file_url;
+    
+    console.log('📄 Full CV Path:', full_path);
+
     // عرض مؤشر التحميل
     frappe.show_alert({
         message: __('Extracting CV data with AI...'),
@@ -35,13 +61,13 @@ function extract_cv_with_ai(frm) {
     let cv_flow_id = frappe.boot.sysdefaults.langflow_cv_extract_flow_id || 
                      frappe.sys_defaults.langflow_cv_extract_flow_id;
 
-    // إرسال الطلب
+    // استدعاء Langflow مباشرة بالـ path فقط
     frappe.call({
-        method: 'langflow_integration.langflow_integration.api.langflow_client.extract_cv_data',
+        method: 'langflow_integration.langflow_integration.api.langflow_client.call_langflow',
         args: {
-            applicant_name: frm.doc.name,
-            cv_file_url: frm.doc.resume_attachment,
-            flow_id: cv_flow_id
+            flow_id: cv_flow_id,
+            input_data: full_path,  // إرسال الـ path فقط
+            session_id: null
         },
         freeze: true,
         freeze_message: __('AI is processing your CV...'),
